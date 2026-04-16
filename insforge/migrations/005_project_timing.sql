@@ -1,0 +1,1 @@
+ALTER TABLE projects ADD COLUMN hours_per_day NUMERIC DEFAULT 8;
