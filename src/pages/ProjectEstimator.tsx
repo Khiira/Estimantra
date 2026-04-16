@@ -13,7 +13,10 @@ export default function ProjectEstimator() {
   const [project, setProject] = useState<any>(null);
   const [roles, setRoles] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [allVersions, setAllVersions] = useState<string[]>(['1.0']);
+  const [selectedVersion, setSelectedVersion] = useState('1.0');
   const [loading, setLoading] = useState(true);
+  const [isVersioning, setIsVersioning] = useState(false);
   const [grandTotals, setGrandTotals] = useState({ hours: 0, cost: 0 });
   
   const [activeTab, setActiveTab] = useState<'estimator' | 'proposal'>('estimator');
@@ -55,7 +58,7 @@ export default function ProjectEstimator() {
     if (projectId) {
       loadWorkspace();
     }
-  }, [projectId]);
+  }, [projectId, selectedVersion]);
 
   const loadWorkspace = async () => {
     // 1. Fetch Project
@@ -71,12 +74,24 @@ export default function ProjectEstimator() {
       .select('*')
       .eq('project_id', projectId);
       
-    // 3. Fetch Tasks
+    // 3. Fetch Tasks for selected version
     const { data: taskData } = await insforge.database
       .from('tasks')
       .select('*')
       .eq('project_id', projectId)
+      .eq('version', selectedVersion)
       .order('created_at', { ascending: true });
+
+    // 3.1 Fetch All available versions for this project
+    const { data: versionData } = await insforge.database
+      .from('tasks')
+      .select('version')
+      .eq('project_id', projectId);
+    
+    if (versionData) {
+      const uniqueVersions = Array.from(new Set(versionData.map((v: any) => v.version || '1.0'))).sort((a: any, b: any) => a.localeCompare(b, undefined, { numeric: true }));
+      setAllVersions(uniqueVersions.length > 0 ? uniqueVersions : ['1.0']);
+    }
 
     // 4. Fetch Org Members
     let members: any[] = [];
@@ -101,6 +116,74 @@ export default function ProjectEstimator() {
     setTasks(taskData || []);
     setOrgMembers(members);
     setLoading(false);
+  };
+
+  const handleCreateNewVersion = async () => {
+    if (!confirm(`¿Deseas crear una nueva versión (instantánea) basada en la v${selectedVersion}?`)) return;
+    
+    setIsVersioning(true);
+    try {
+      // 1. Calcular nueva versión (ej: 1.0 -> 1.1)
+      const lastVersion = allVersions[allVersions.length - 1] || '1.0';
+      const parts = lastVersion.split('.');
+      let nextVersion = '2.0';
+      
+      if (parts.length >= 2) {
+        const major = parseInt(parts[0]);
+        const minor = parseInt(parts[1]);
+        nextVersion = `${major}.${minor + 1}`;
+      } else if (!isNaN(parseInt(lastVersion))) {
+        nextVersion = `${parseInt(lastVersion) + 1}.0`;
+      }
+
+      // 2. Obtener tareas actuales para clonar
+      const { data: currentTasks } = await insforge.database
+         .from('tasks')
+         .select('*')
+         .eq('project_id', projectId)
+         .eq('version', selectedVersion);
+
+      if (!currentTasks || currentTasks.length === 0) {
+        alert("No hay tareas para clonar en esta versión.");
+        setIsVersioning(false);
+        return;
+      }
+
+      // 3. Clonar manteniendo jerarquía
+      const idMap: Record<string, string> = {};
+      
+      const tasksToInsert = currentTasks.map(t => {
+        const newId = self.crypto.randomUUID();
+        idMap[t.id] = newId;
+        return {
+          ...t,
+          id: newId,
+          version: nextVersion,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      });
+
+      const finalTasks = tasksToInsert.map(t => ({
+        ...t,
+        parent_id: t.parent_id ? (idMap[t.parent_id] || null) : null
+      }));
+
+      const { error } = await insforge.database
+        .from('tasks')
+        .insert(finalTasks);
+
+      if (error) throw error;
+
+      setAllVersions(prev => [...prev, nextVersion]);
+      setSelectedVersion(nextVersion);
+      alert(`Versión ${nextVersion} creada exitosamente.`);
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error al crear versión: ${err.message}`);
+    } finally {
+      setIsVersioning(false);
+    }
   };
 
   if (loading) {
@@ -131,11 +214,34 @@ export default function ProjectEstimator() {
               <ArrowLeft size={20} />
             </button>
           </Link>
-          <div>
-            <h2>{project.name}</h2>
-            <div className="project-meta">
-              {project.category && <span className="category-tag">{project.category}</span>}
-              {project.clients?.name && <span className="client-tag">Cliente: {project.clients.name}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div>
+              <h2>{project.name}</h2>
+              <div className="project-meta">
+                {project.category && <span className="category-tag">{project.category}</span>}
+                {project.clients?.name && <span className="client-tag">Cliente: {project.clients.name}</span>}
+              </div>
+            </div>
+
+            <div className="version-selector-container">
+               <select 
+                 className="version-select"
+                 value={selectedVersion}
+                 onChange={(e) => setSelectedVersion(e.target.value)}
+                 disabled={isVersioning}
+                 title="Seleccionar versión de estimación"
+               >
+                 {allVersions.map(v => <option key={v} value={v}>v{v}</option>)}
+               </select>
+               <button 
+                 className="icon-btn tiny accent-btn" 
+                 onClick={handleCreateNewVersion}
+                 disabled={isVersioning}
+                 title="Crear nueva versión (+0.1)"
+                 style={{ padding: '4px 10px', fontSize: '0.75rem', height: 'auto', borderRadius: '4px', fontWeight: 600 }}
+               >
+                 {isVersioning ? '...' : '+ Versión'}
+               </button>
             </div>
           </div>
         </div>
@@ -258,6 +364,7 @@ export default function ProjectEstimator() {
               tasks={tasks} 
               roles={roles} 
               projectId={projectId} 
+              version={selectedVersion}
               onTasksChange={setTasks} 
               onTotalsChange={(h: number, c: number) => setGrandTotals({ hours: h, cost: c })}
             />
@@ -294,6 +401,40 @@ export default function ProjectEstimator() {
         .icon-btn.tooltip { background: transparent; border: none; padding: 8px; border-radius: 50%; display: flex;}
         .icon-btn.tooltip:hover { background: var(--color-bg-tertiary); color: var(--color-accent-mint); }
         
+        .version-selector-container {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(255,255,255,0.05);
+          padding: 4px 10px;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--color-border);
+          margin-left: 10px;
+        }
+        .version-select {
+          background: transparent;
+          border: none;
+          color: var(--color-accent-mint);
+          font-weight: 600;
+          font-size: 0.9rem;
+          outline: none;
+          cursor: pointer;
+        }
+        .accent-btn {
+          background: rgba(72, 229, 194, 0.1);
+          color: var(--color-accent-mint);
+          border: 1px solid var(--color-accent-mint);
+          transition: all 0.2s;
+        }
+        .accent-btn:hover:not(:disabled) {
+          background: var(--color-accent-mint);
+          color: var(--color-bg-primary);
+        }
+        .accent-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
         .tab-btn {
             background: transparent;
             border: none;
@@ -319,7 +460,6 @@ export default function ProjectEstimator() {
           flex-grow: 1;
         }
         
-        /* Paneles con diseño limpio (Zen) */
         .roles-panel, .tasks-panel {
           background: rgba(28, 37, 65, 0.4);
           border: 1px solid var(--color-border);
@@ -336,12 +476,6 @@ export default function ProjectEstimator() {
         .panel-header h3 {
           margin: 0;
           font-weight: 500;
-        }
-        
-        .hint {
-          font-size: 0.8rem;
-          color: var(--color-text-secondary);
-          margin-bottom: 20px;
         }
         
         .empty-msg {
@@ -370,7 +504,6 @@ export default function ProjectEstimator() {
           font-family: monospace;
         }
 
-        /* Classes from Refactor */
         .title-skeleton { width: 200px; height: 35px; }
         .totals-skeleton { width: 150px; height: 55px; }
         .loading-grid { gap: 20px; }

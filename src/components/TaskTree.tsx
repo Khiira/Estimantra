@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { insforge } from '../lib/insforge';
 import { ChevronRight, ChevronDown, Plus, Trash2, Clock, AlignLeft, DollarSign } from 'lucide-react';
 
-export default function TaskTree({ tasks, roles, projectId, onTasksChange, onTotalsChange }: any) {
+export default function TaskTree({ tasks, roles, projectId, version, onTasksChange, onTotalsChange }: any) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [editingDetailsId, setEditingDetailsId] = useState<string | null>(null);
   const [addingTaskTo, setAddingTaskTo] = useState<string | null>(null);
@@ -76,7 +76,8 @@ export default function TaskTree({ tasks, roles, projectId, onTasksChange, onTot
     const newTask: any = {
       project_id: projectId,
       task_name: newTaskName,
-      estimated_hours: 0
+      estimated_hours: 0,
+      version: version || '1.0'
     };
     if (parentId) newTask.parent_id = parentId;
 
@@ -100,6 +101,7 @@ export default function TaskTree({ tasks, roles, projectId, onTasksChange, onTot
     if (parentId) {
       setExpanded(prev => ({ ...prev, [parentId]: true }));
     }
+  };
   };
 
   const handleUpdateTask = (id: string, field: string, value: any) => {
@@ -181,7 +183,7 @@ export default function TaskTree({ tasks, roles, projectId, onTasksChange, onTot
                 </button>
               </div>
             ) : (
-              // Modo "Rama": Solo muestra total heredado
+              // Modo "Rama": Muestra total heredado MÁS el botón de descripción
               <div className="task-hours" style={{ gap: '15px' }}>
                 <span title="Costo Parcial (Calculado)">
                   <DollarSign size={12}/> {node.totalCost.toLocaleString('en-US')}
@@ -189,6 +191,13 @@ export default function TaskTree({ tasks, roles, projectId, onTasksChange, onTot
                 <span title="Horas (Calculadas)">
                   <Clock size={12}/> {node.totalHours}h
                 </span>
+                <button 
+                  className={`icon-btn tiny ${editingDetailsId === node.id ? 'active-accent' : ''}`}
+                  title="Añadir descripción" 
+                  onClick={(e) => { e.stopPropagation(); setEditingDetailsId(editingDetailsId === node.id ? null : node.id); }}
+                >
+                  <AlignLeft size={14} />
+                </button>
               </div>
             )}
 
@@ -203,8 +212,8 @@ export default function TaskTree({ tasks, roles, projectId, onTasksChange, onTot
           </div>
         </div>
 
-        {/* Panel Desplegable de Descripción Opcional */}
-        {editingDetailsId === node.id && !hasChildren && (
+        {/* Panel Desplegable de Descripción Opcional (Ahora para todos) */}
+        {editingDetailsId === node.id && (
           <div className="task-details-panel" style={{ marginLeft: `${depth * 25 + 32}px` }}>
             <textarea 
               placeholder="Descripción opcional de cómo se ejecutará esta tarea..."
