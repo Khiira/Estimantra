@@ -7,7 +7,7 @@ export default function TaskTree({ tasks, roles, projectId, onTasksChange, onTot
   const [editingDetailsId, setEditingDetailsId] = useState<string | null>(null);
   const [addingTaskTo, setAddingTaskTo] = useState<string | null>(null);
   const [newTaskName, setNewTaskName] = useState('');
-  const timeoutRefs = useRef<Record<string, NodeJS.Timeout>>({});
+  const timeoutRefs = useRef<Record<string, any>>({});
 
   // 1. Construir árbol
   const treeData = useMemo(() => {
