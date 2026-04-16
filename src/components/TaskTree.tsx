@@ -102,7 +102,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
       setExpanded(prev => ({ ...prev, [parentId]: true }));
     }
   };
-  };
+
 
   const handleUpdateTask = (id: string, field: string, value: any) => {
     // 1. Actualización optimista local

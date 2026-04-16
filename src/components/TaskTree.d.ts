@@ -1,1 +1,1 @@
-export default function TaskTree({ tasks, roles, projectId, onTasksChange, onTotalsChange }: any): import("react/jsx-runtime").JSX.Element;
+export default function TaskTree({ tasks, roles, projectId, version, onTasksChange, onTotalsChange }: any): import("react/jsx-runtime").JSX.Element;

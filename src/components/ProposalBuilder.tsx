@@ -4,11 +4,11 @@ import { Copy, Check } from 'lucide-react';
 interface ProposalBuilderProps {
   project: any;
   tasks: any[];
-  roles: any[];
   grandTotals: { hours: number; cost: number };
 }
 
-export default function ProposalBuilder({ project, tasks, roles, grandTotals }: ProposalBuilderProps) {
+export default function ProposalBuilder({ project, tasks, grandTotals }: ProposalBuilderProps) {
+
   const tableRef = useRef<HTMLTableElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -166,7 +166,8 @@ export default function ProposalBuilder({ project, tasks, roles, grandTotals }: 
                           <td style={{ borderBottom: '1px solid #eee', padding: '12px', textAlign: 'right' }}>{row.hours !== 0 || !row.isParent ? row.hours : ''}</td>
                           <td style={{ borderBottom: '1px solid #eee', padding: '12px', textAlign: 'right' }}>{row.hours !== 0 || !row.isParent ? (row.hours / (project.hours_per_day || 8)).toFixed(1) : ''}</td>
                       </tr>
-                  ) : null)}
+                  ))}
+
               </tbody>
               {tableData.length > 0 && (
                 <tfoot>

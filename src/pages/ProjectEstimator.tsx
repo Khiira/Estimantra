@@ -373,7 +373,8 @@ export default function ProjectEstimator() {
       </div>
       ) : (
         <div className="proposal-view-container">
-             <ProposalBuilder project={project} tasks={tasks} roles={roles} grandTotals={grandTotals} />
+             <ProposalBuilder project={project} tasks={tasks} grandTotals={grandTotals} />
+
         </div>
       )}
 
