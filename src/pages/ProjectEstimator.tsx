@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRoute } from 'wouter';
 import { insforge } from '../lib/insforge';
 import { ArrowLeft, Plus, Check } from 'lucide-react';
@@ -18,39 +18,7 @@ export default function ProjectEstimator() {
   const [loading, setLoading] = useState(true);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [isVersioning, setIsVersioning] = useState(false);
-  // grandTotals calculated directly from tasks+roles so it updates
-  // regardless of which tab is active (estimator or proposal).
-  const grandTotals = useMemo(() => {
-    const taskMap = new Map<string, any>();
-    tasks.forEach((t: any) => taskMap.set(t.id, { ...t, children: [] }));
-    const roots: any[] = [];
-    tasks.forEach((t: any) => {
-      if (t.parent_id && taskMap.has(t.parent_id)) {
-        taskMap.get(t.parent_id).children.push(taskMap.get(t.id));
-      } else {
-        roots.push(taskMap.get(t.id));
-      }
-    });
-    const calcNode = (node: any): { h: number; c: number } => {
-      const role = roles.find((r: any) => r.id === node.assigned_role_id);
-      if (!node.children || node.children.length === 0) {
-        const h = Number(node.estimated_hours || 0);
-        return { h, c: h * Number(role?.hourly_rate || 0) };
-      }
-      return node.children.reduce(
-        (acc: { h: number; c: number }, child: any) => {
-          const sub = calcNode(child);
-          return { h: acc.h + sub.h, c: acc.c + sub.c };
-        },
-        { h: 0, c: 0 }
-      );
-    };
-    const totals = roots.reduce(
-      (acc, r) => { const t = calcNode(r); return { hours: acc.hours + t.h, cost: acc.cost + t.c }; },
-      { hours: 0, cost: 0 }
-    );
-    return totals;
-  }, [tasks, roles]);
+  const [grandTotals, setGrandTotals] = useState({ hours: 0, cost: 0 });
   
   const [activeTab, setActiveTab] = useState<'estimator' | 'proposal'>('estimator');
   
@@ -93,12 +61,47 @@ export default function ProjectEstimator() {
     }
   }, [projectId, selectedVersion]);
 
-  // Separate effect: show task skeleton when version changes (after initial load)
+  // Effect 1 — show skeleton when version changes (after initial load)
   useEffect(() => {
     if (!loading && projectId) {
       setLoadingTasks(true);
+      // Reset totals immediately so old version data doesn't linger
+      setGrandTotals({ hours: 0, cost: 0 });
     }
   }, [selectedVersion]);
+
+  // Effect 2 — recalculate grandTotals whenever tasks or roles update
+  useEffect(() => {
+    const taskMap = new Map<string, any>();
+    tasks.forEach((t: any) => taskMap.set(t.id, { ...t, children: [] }));
+    const roots: any[] = [];
+    tasks.forEach((t: any) => {
+      if (t.parent_id && taskMap.has(t.parent_id)) {
+        taskMap.get(t.parent_id).children.push(taskMap.get(t.id));
+      } else {
+        roots.push(taskMap.get(t.id));
+      }
+    });
+    const calcNode = (node: any): { h: number; c: number } => {
+      const role = roles.find((r: any) => r.id === node.assigned_role_id);
+      if (node.children.length === 0) {
+        const h = Number(node.estimated_hours || 0);
+        return { h, c: h * Number(role?.hourly_rate || 0) };
+      }
+      return node.children.reduce(
+        (acc: { h: number; c: number }, child: any) => {
+          const s = calcNode(child);
+          return { h: acc.h + s.h, c: acc.c + s.c };
+        },
+        { h: 0, c: 0 }
+      );
+    };
+    const total = roots.reduce(
+      (acc, r) => { const s = calcNode(r); return { hours: acc.hours + s.h, cost: acc.cost + s.c }; },
+      { hours: 0, cost: 0 }
+    );
+    setGrandTotals(total);
+  }, [tasks, roles]);
 
   const loadWorkspace = async () => {
     // 1. Fetch Project
