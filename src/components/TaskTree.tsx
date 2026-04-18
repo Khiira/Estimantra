@@ -8,6 +8,8 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
   const [addingTaskTo, setAddingTaskTo] = useState<string | null>(null);
   const [newTaskName, setNewTaskName] = useState('');
   const timeoutRefs = useRef<Record<string, any>>({});
+  // Guard to prevent double-insert when Enter key AND onBlur fire together
+  const isSubmitting = useRef(false);
 
   // 1. Construir árbol
   const treeData = useMemo(() => {
@@ -68,10 +70,14 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
   };
 
   const handleCreateTask = async (parentId: string | null) => {
+    // Guard against double-submit (Enter key fires submit, then onBlur also fires)
+    if (isSubmitting.current) return;
     if (!newTaskName.trim()) {
       setAddingTaskTo(null);
       return;
     }
+
+    isSubmitting.current = true;
 
     const newTask: any = {
       project_id: projectId,
@@ -85,6 +91,8 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
       .from('tasks')
       .insert([newTask])
       .select();
+
+    isSubmitting.current = false;
 
     if (error) {
       alert(`Error al crear tarea: ${error.message || JSON.stringify(error)}`);
@@ -126,8 +134,15 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
     if(!confirm("¿Eliminar tarea y todas sus subtareas?")) return;
     const { error } = await insforge.database.from('tasks').delete().eq('id', id);
     if (!error) {
-      // Elimina localmente (muy simple, remueve por id pero idealmente debería borrar del flat array todo el subarbol)
-      onTasksChange(tasks.filter((t: any) => t.id !== id && t.parent_id !== id));
+      // Collect all descendant IDs recursively from the flat tasks array
+      const collectDescendants = (parentId: string, allTasks: any[]): string[] => {
+        const children = allTasks.filter((t: any) => t.parent_id === parentId);
+        return children.reduce((acc: string[], child: any) => {
+          return [...acc, child.id, ...collectDescendants(child.id, allTasks)];
+        }, []);
+      };
+      const idsToRemove = new Set([id, ...collectDescendants(id, tasks)]);
+      onTasksChange(tasks.filter((t: any) => !idsToRemove.has(t.id)));
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRoute } from 'wouter';
 import { insforge } from '../lib/insforge';
 import { ArrowLeft, Plus, Check } from 'lucide-react';
@@ -16,8 +16,41 @@ export default function ProjectEstimator() {
   const [allVersions, setAllVersions] = useState<string[]>(['1.0']);
   const [selectedVersion, setSelectedVersion] = useState('1.0');
   const [loading, setLoading] = useState(true);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const [isVersioning, setIsVersioning] = useState(false);
-  const [grandTotals, setGrandTotals] = useState({ hours: 0, cost: 0 });
+  // grandTotals calculated directly from tasks+roles so it updates
+  // regardless of which tab is active (estimator or proposal).
+  const grandTotals = useMemo(() => {
+    const taskMap = new Map<string, any>();
+    tasks.forEach((t: any) => taskMap.set(t.id, { ...t, children: [] }));
+    const roots: any[] = [];
+    tasks.forEach((t: any) => {
+      if (t.parent_id && taskMap.has(t.parent_id)) {
+        taskMap.get(t.parent_id).children.push(taskMap.get(t.id));
+      } else {
+        roots.push(taskMap.get(t.id));
+      }
+    });
+    const calcNode = (node: any): { h: number; c: number } => {
+      const role = roles.find((r: any) => r.id === node.assigned_role_id);
+      if (!node.children || node.children.length === 0) {
+        const h = Number(node.estimated_hours || 0);
+        return { h, c: h * Number(role?.hourly_rate || 0) };
+      }
+      return node.children.reduce(
+        (acc: { h: number; c: number }, child: any) => {
+          const sub = calcNode(child);
+          return { h: acc.h + sub.h, c: acc.c + sub.c };
+        },
+        { h: 0, c: 0 }
+      );
+    };
+    const totals = roots.reduce(
+      (acc, r) => { const t = calcNode(r); return { hours: acc.hours + t.h, cost: acc.cost + t.c }; },
+      { hours: 0, cost: 0 }
+    );
+    return totals;
+  }, [tasks, roles]);
   
   const [activeTab, setActiveTab] = useState<'estimator' | 'proposal'>('estimator');
   
@@ -59,6 +92,13 @@ export default function ProjectEstimator() {
       loadWorkspace();
     }
   }, [projectId, selectedVersion]);
+
+  // Separate effect: show task skeleton when version changes (after initial load)
+  useEffect(() => {
+    if (!loading && projectId) {
+      setLoadingTasks(true);
+    }
+  }, [selectedVersion]);
 
   const loadWorkspace = async () => {
     // 1. Fetch Project
@@ -116,6 +156,7 @@ export default function ProjectEstimator() {
     setTasks(taskData || []);
     setOrgMembers(members);
     setLoading(false);
+    setLoadingTasks(false);
   };
 
   const handleCreateNewVersion = async () => {
@@ -228,7 +269,7 @@ export default function ProjectEstimator() {
                  className="version-select"
                  value={selectedVersion}
                  onChange={(e) => setSelectedVersion(e.target.value)}
-                 disabled={isVersioning}
+                 disabled={isVersioning || loadingTasks}
                  title="Seleccionar versión de estimación"
                >
                  {allVersions.map(v => <option key={v} value={v}>v{v}</option>)}
@@ -360,14 +401,25 @@ export default function ProjectEstimator() {
           </div>
           
           <div className="tasks-tree">
-            <TaskTree 
-              tasks={tasks} 
-              roles={roles} 
-              projectId={projectId} 
-              version={selectedVersion}
-              onTasksChange={setTasks} 
-              onTotalsChange={(h: number, c: number) => setGrandTotals({ hours: h, cost: c })}
-            />
+            {loadingTasks ? (
+              <div className="tasks-skeleton-list" aria-label="Cargando tareas...">
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="task-skeleton-row skeleton"
+                    style={{ animationDelay: `${i * 0.07}s`, width: `${100 - i * 6}%` }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <TaskTree 
+                tasks={tasks} 
+                roles={roles} 
+                projectId={projectId} 
+                version={selectedVersion}
+                onTasksChange={setTasks} 
+              />
+            )}
           </div>
         </main>
       </div>
@@ -529,6 +581,36 @@ export default function ProjectEstimator() {
         .tasks-main { animation-delay: 0.1s; }
         .proposal-view-container { padding: 30px 40px; }
         .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+
+        /* ── Skeleton al cambiar versión ── */
+        .tasks-skeleton-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          padding: 10px 0;
+        }
+        .task-skeleton-row {
+          height: 38px;
+          border-radius: var(--radius-md);
+        }
+        @keyframes skeleton-pulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.45; }
+        }
+        .skeleton {
+          background: linear-gradient(
+            90deg,
+            var(--color-bg-tertiary) 25%,
+            rgba(72,229,194,0.08) 50%,
+            var(--color-bg-tertiary) 75%
+          );
+          background-size: 200% 100%;
+          animation: shimmer 1.4s ease-in-out infinite, skeleton-pulse 1.4s ease-in-out infinite;
+        }
+        @keyframes shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
       `}</style>
     </div>
   );
