@@ -39,33 +39,26 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-import Footer from './components/Footer';
-
 function AppRouter() {
   return (
-    <div className="app-container">
-      <main className="app-main">
-        <Switch>
-          <Route path="/login" component={Login} />
-          <Route path="/organization">
-            <ProtectedRoute>
-              <OrganizationSettings />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/">
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/project/:id">
-            <ProtectedRoute>
-              <ProjectEstimator />
-            </ProtectedRoute>
-          </Route>
-        </Switch>
-      </main>
-      <Footer />
-    </div>
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route path="/organization">
+        <ProtectedRoute>
+          <OrganizationSettings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/">
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/project/:id">
+        <ProtectedRoute>
+          <ProjectEstimator />
+        </ProtectedRoute>
+      </Route>
+    </Switch>
   );
 }
 
@@ -76,4 +69,5 @@ export default function App() {
     </SessionProvider>
   );
 }
+
 
