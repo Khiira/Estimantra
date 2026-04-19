@@ -105,15 +105,26 @@ export default function Login() {
 
   if (verificationMode) {
     return (
-      <div className="login-wrapper">
+      <div className="login-wrapper" style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        width: '100vw', 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        zIndex: 1000 
+      }}>
         <div className="login-card animate-fade-in" style={{ 
           textAlign: 'center', 
-          maxWidth: '450px', 
-          padding: '40px',
-          background: 'rgba(28, 37, 65, 0.98)', 
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(72, 229, 194, 0.25)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+          width: '100%',
+          maxWidth: '480px', 
+          padding: '48px',
+          background: 'rgba(28, 37, 65, 0.95)', 
+          backdropFilter: 'blur(30px)',
+          border: '1px solid rgba(72, 229, 194, 0.2)',
+          boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.6)',
+          borderRadius: '32px'
         }}>
           <div className="verification-icon-container">
             <ShieldCheck size={48} />
@@ -128,12 +139,18 @@ export default function Login() {
           {message && <div className="message-box-simple">{message}</div>}
 
           <div className="otp-container">
+            <div className="otp-inputs-wrapper">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className={`otp-box ${otp.length === i ? 'active' : ''} ${otp.length > i ? 'filled' : ''}`}>
+                  {otp[i] || ''}
+                </div>
+              ))}
+            </div>
             <input 
               type="text" 
-              placeholder="0 0 0 0 0 0" 
               value={otp} 
               onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="otp-input"
+              className="otp-hidden-input"
               disabled={loading}
               autoFocus
             />
@@ -144,16 +161,16 @@ export default function Login() {
             onClick={handleVerify} 
             className="primary" 
             disabled={loading || otp.length < 6}
-            style={{ width: '100%', padding: '16px', fontSize: '1.1rem' }}
+            style={{ width: '100%', padding: '16px', fontSize: '1.1rem', borderRadius: '14px' }}
           >
             {loading ? <RefreshCw className="animate-spin" /> : 'Confirmar Identidad'}
           </button>
 
           <footer className="verification-footer">
-            <button onClick={handleResendCode} className="text-button flex-center" disabled={loading}>
+            <button onClick={handleResendCode} className="text-button flex-center" disabled={loading} style={{ opacity: 0.8 }}>
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> No recibí el código, reenviar
             </button>
-            <button onClick={() => setVerificationMode(false)} className="text-button flex-center" style={{ color: 'var(--color-text-secondary)' }}>
+            <button onClick={() => setVerificationMode(false)} className="text-button flex-center" style={{ color: 'var(--color-text-secondary)', opacity: 0.6 }}>
               <ArrowLeft size={14} /> Usar otro correo
             </button>
           </footer>
@@ -163,7 +180,7 @@ export default function Login() {
               display: inline-flex;
               padding: 24px;
               background: linear-gradient(135deg, rgba(72, 229, 194, 0.15), rgba(72, 229, 194, 0.05));
-              border-radius: 24px;
+              border-radius: 28px;
               margin-bottom: 24px;
               color: var(--color-accent-mint);
               box-shadow: 0 12px 24px rgba(0,0,0,0.2);
@@ -172,7 +189,7 @@ export default function Login() {
             .email-highlight {
               color: var(--color-accent-mint);
               font-weight: 600;
-              opacity: 0.95;
+              opacity: 1;
             }
             .message-box-simple {
               background: rgba(72, 229, 194, 0.08);
@@ -184,38 +201,58 @@ export default function Login() {
               border: 1px solid rgba(72, 229, 194, 0.15);
             }
             .otp-container {
-              margin-bottom: 32px;
+              margin-bottom: 40px;
+              position: relative;
             }
-            .otp-input {
+            .otp-inputs-wrapper {
+              display: flex;
+              gap: 12px;
+              justify-content: center;
+              margin-bottom: 10px;
+            }
+            .otp-box {
+              width: 50px;
+              height: 60px;
+              background: rgba(0,0,0,0.3);
+              border: 2px solid var(--color-border);
+              border-radius: 12px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 1.8rem;
+              font-weight: 700;
+              color: var(--color-accent-mint);
+              transition: all 0.2s;
+            }
+            .otp-box.active {
+              border-color: var(--color-accent-mint);
+              box-shadow: 0 0 15px rgba(72, 229, 194, 0.2);
+              transform: scale(1.05);
+            }
+            .otp-box.filled {
+              background: rgba(72, 229, 194, 0.05);
+              border-color: rgba(72, 229, 194, 0.4);
+            }
+            .otp-hidden-input {
+              position: absolute;
+              opacity: 0;
               width: 100%;
-              background: rgba(0,0,0,0.2) !important;
-              border: 2px solid var(--color-border) !important;
-              border-radius: 16px !important;
-              font-size: 2.8rem !important;
-              letter-spacing: 12px !important;
-              font-weight: 800 !important;
-              padding: 20px !important;
-              text-align: center !important;
-              color: var(--color-accent-mint) !important;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            }
-            .otp-input:focus {
-              border-color: var(--color-accent-mint) !important;
-              box-shadow: 0 0 30px rgba(72, 229, 194, 0.12) !important;
-              outline: none !important;
-              transform: scale(1.02);
+              height: 60px;
+              top: 0;
+              left: 0;
+              cursor: pointer;
             }
             .otp-helper-text {
-              margin-top: 14px;
+              margin-top: 18px;
               font-size: 0.85rem;
               color: var(--color-text-secondary);
-              opacity: 0.8;
+              opacity: 0.7;
             }
             .verification-footer {
-              margin-top: 36px;
+              margin-top: 40px;
               display: flex;
               flex-direction: column;
-              gap: 14px;
+              gap: 16px;
               align-items: center;
             }
             .animate-shake {

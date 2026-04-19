@@ -46,6 +46,9 @@ export default function Profile() {
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+   // Estado de miembros del equipo
+  const [members, setMembers] = useState<any[]>([]);
+
   useEffect(() => {
     if (user) {
       setName(user.user_metadata?.name || '');
@@ -56,6 +59,62 @@ export default function Profile() {
       setTeamPanel('selection');
     }
   }, [user]);
+
+  // Manejar tiempo real para miembros cuando se abre un equipo
+  useEffect(() => {
+    let realtimeCleanup: (() => void) | undefined;
+
+    if (showTeamModal && selectedTeam) {
+      loadTeamMembers();
+      setupTeamRealtime().then(cleanup => {
+        realtimeCleanup = cleanup;
+      });
+    }
+
+    return () => {
+      if (realtimeCleanup) realtimeCleanup();
+      if (selectedTeam) {
+        insforge.realtime.unsubscribe(`org_members:${selectedTeam.id}`);
+      }
+    };
+  }, [showTeamModal, selectedTeam]);
+
+  const loadTeamMembers = async () => {
+    if (!selectedTeam) return;
+    try {
+      // Nota: Necesitamos unir con la info de usuario si el SDK lo permite, 
+      // o usar los campos que tengamos en organization_members
+      const { data, error } = await insforge.database
+        .from('organization_members')
+        .select('*, user_metadata') // Asumiendo que user_metadata está accesible o es parte de la lógica del SDK
+        .eq('org_id', selectedTeam.id);
+      
+      if (error) throw error;
+      if (data) setMembers(data);
+    } catch (err) {
+      console.error('Error cargando miembros:', err);
+    }
+  };
+
+  const setupTeamRealtime = async () => {
+    if (!selectedTeam) return;
+    
+    await insforge.realtime.connect();
+    // Suscribirse a cambios en los miembros de esta organización específica
+    await insforge.realtime.subscribe(`org_members:${selectedTeam.id}`);
+    
+    const handleChange = () => loadTeamMembers();
+
+    insforge.realtime.on('INSERT_organization_member', handleChange);
+    insforge.realtime.on('UPDATE_organization_member', handleChange);
+    insforge.realtime.on('DELETE_organization_member', handleChange);
+
+    return () => {
+      insforge.realtime.off('INSERT_organization_member', handleChange);
+      insforge.realtime.off('UPDATE_organization_member', handleChange);
+      insforge.realtime.off('DELETE_organization_member', handleChange);
+    };
+  };
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -531,6 +590,32 @@ export default function Profile() {
                   Comparte este código único para que otros miembros se unan a tu equipo.
                 </p>
               </div>
+
+               {/* Lista de Miembros */}
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '24px', borderRadius: '20px', border: '1px solid var(--color-border)' }}>
+                  <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    <Users size={14} /> Miembros del Equipo ({members.length})
+                  </label>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto', paddingRight: '8px' }}>
+                    {members.map((member: any) => (
+                      <div key={member.user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '32px', height: '32px', background: 'rgba(72,229,194,0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyCenter: 'center', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-accent-mint)', display: 'flex', justifyContent: 'center' }}>
+                            {member.user_metadata?.name?.[0] || 'U'}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{member.user_metadata?.name || 'Usuario'}</span>
+                            <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>{member.user_role === 'admin' ? 'Administrador' : 'Miembro'}</span>
+                          </div>
+                        </div>
+                        {member.user_id === user.id && (
+                          <span style={{ fontSize: '0.65rem', background: 'rgba(72,229,194,0.2)', color: 'var(--color-accent-mint)', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>TÚ</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
               {/* Danger Zone */}
               {selectedTeam.role === 'admin' && (

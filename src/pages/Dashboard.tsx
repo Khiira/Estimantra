@@ -325,47 +325,117 @@ export default function Dashboard() {
     return (
       <div className="container flex-column-center-vh">
         {onboardingMode === 'selection' && (
-          <div className="onboarding-selection animate-fade-in">
+          <div className="onboarding-glass-container animate-fade-in">
             <header className="onboarding-header">
-              <h1 className="title-gradient" style={{ fontSize: '2.8rem', marginBottom: '10px' }}>Bienvenido a Estimantra</h1>
-              <p style={{ fontSize: '1.1rem', color: 'var(--color-text-secondary)' }}>Elige cómo quieres empezar a colaborar hoy.</p>
+              <h1 className="title-gradient" style={{ fontSize: '3.2rem', marginBottom: '12px', letterSpacing: '-1px' }}>Bienvenido a Estimantra</h1>
+              <p style={{ fontSize: '1.2rem', color: 'var(--color-text-secondary)', opacity: 0.8 }}>Elige cómo quieres empezar a colaborar hoy.</p>
             </header>
             
-            <div className="onboarding-grid" style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-              gap: '24px', 
-              width: '100%',
-              justifyContent: 'center',
-              maxWidth: '900px'
-            }}>
-              <div className="onboarding-option-card" onClick={() => setOnboardingMode('create')} style={{ padding: '35px 30px' }}>
-                <div className="option-icon" style={{ width: '60px', height: '60px' }}>
-                  <Building size={28} />
+            <div className="onboarding-grid-glass">
+              <div className="glass-card option-card primary" onClick={() => setOnboardingMode('create')}>
+                <div className="glass-icon-container">
+                  <Building size={32} />
                 </div>
                 <h3>Crear Equipo</h3>
-                <p>Crea un nuevo espacio de trabajo profesional para centralizar tus proyectos y equipo.</p>
-                <div className="option-footer" style={{ marginTop: 'auto', fontWeight: 'bold', color: 'var(--color-accent-mint)', background: 'transparent', border: 'none', padding: 0 }}>Crear ahora →</div>
+                <p>Inicia un nuevo espacio de trabajo profesional para centralizar tus proyectos.</p>
+                <div className="glass-action-btn">Comenzar ahora →</div>
               </div>
 
-              <div className="onboarding-option-card" onClick={() => setOnboardingMode('join')}>
-                <div className="option-icon" style={{ color: 'var(--color-text-secondary)', background: 'rgba(255,255,255,0.05)' }}>
+              <div className="glass-card option-card secondary" onClick={() => setOnboardingMode('join')}>
+                <div className="glass-icon-container secondary">
                   <FolderPlus size={32} />
                 </div>
                 <h3>Unirme a Equipo</h3>
-                <p>¿Tienes un código de invitación? Ingrésalo para sumarte a un espacio existente.</p>
-                <div className="option-footer" style={{ marginTop: 'auto', fontWeight: 'bold', color: 'var(--color-text-secondary)', background: 'transparent', border: 'none', padding: 0 }}>Ingresar código →</div>
+                <p>¿Ya tienes un código? Ingrésalo para sumarte a un equipo existente.</p>
+                <div className="glass-action-btn secondary">Ingresar código →</div>
               </div>
             </div>
-            
-            {activeOrganization && (
-              <button 
-                onClick={() => setLocation('/')} 
-                style={{ marginTop: '50px', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', padding: '12px 24px', borderRadius: '12px', cursor: 'pointer' }}
-              >
-                Volver al Panel Actual
-              </button>
-            )}
+
+            <style>{`
+              .onboarding-glass-container {
+                width: 100%;
+                max-width: 1000px;
+                padding: 60px;
+                background: rgba(28, 37, 65, 0.4);
+                backdrop-filter: blur(25px);
+                border: 1px solid rgba(72, 229, 194, 0.15);
+                border-radius: 48px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                box-shadow: 0 40px 100px rgba(0,0,0,0.4);
+              }
+              .onboarding-grid-glass {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                gap: 32px;
+                width: 100%;
+                margin-top: 40px;
+              }
+              .glass-card {
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                padding: 40px;
+                border-radius: 32px;
+                cursor: pointer;
+                transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+                position: relative;
+                overflow: hidden;
+              }
+              .glass-card:hover {
+                background: rgba(255, 255, 255, 0.06);
+                transform: translateY(-10px);
+                border-color: rgba(72, 229, 194, 0.4);
+                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+              }
+              .glass-card.primary:hover {
+                box-shadow: 0 20px 40px rgba(72, 229, 194, 0.1);
+              }
+              .glass-icon-container {
+                width: 64px;
+                height: 64px;
+                background: rgba(72, 229, 194, 0.15);
+                border: 1px solid rgba(72, 229, 194, 0.2);
+                border-radius: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--color-accent-mint);
+                box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+              }
+              .glass-icon-container.secondary {
+                background: rgba(255, 255, 255, 0.05);
+                border-color: rgba(255, 255, 255, 0.1);
+                color: var(--color-text-secondary);
+              }
+              .glass-card h3 {
+                font-size: 1.6rem;
+                font-weight: 700;
+                margin: 0;
+              }
+              .glass-card p {
+                font-size: 1rem;
+                color: var(--color-text-secondary);
+                line-height: 1.6;
+                margin: 0;
+              }
+              .glass-action-btn {
+                font-weight: 700;
+                color: var(--color-accent-mint);
+                margin-top: 10px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 1.1rem;
+              }
+              .glass-action-btn.secondary {
+                color: var(--color-text-secondary);
+                opacity: 0.8;
+              }
+            `}</style>
           </div>
         )}
 

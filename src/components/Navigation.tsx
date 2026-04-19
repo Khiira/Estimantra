@@ -79,38 +79,39 @@ export default function Navigation() {
           </button>
 
           {showDropdown && (
-            <div className="dropdown-menu">
-              <div className="dropdown-header">
-                <p>Sesión iniciada como</p>
-                <strong>{userDisplayName}</strong>
+            <div className="dropdown-menu" style={{ width: '250px', padding: '12px 0' }}>
+              <div className="dropdown-header" style={{ padding: '0 16px 12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <p style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '4px' }}>Sesión iniciada como</p>
+                <strong style={{ fontSize: '1rem', color: 'white' }}>{userDisplayName}</strong>
               </div>
+              <div style={{ height: '8px' }}></div>
               
               <Link href="/profile" onClick={() => setShowDropdown(false)}>
                 <button className="dropdown-item">
-                  <User size={16} /> Mi Perfil
+                  <User size={16} /> <span>Mi Perfil</span>
                 </button>
               </Link>
               
               <Link href="/organization" onClick={() => setShowDropdown(false)}>
                 <button className="dropdown-item">
-                  <Settings size={16} /> Configuración del Equipo
+                  <Settings size={16} /> <span style={{ whiteSpace: 'nowrap' }}>Configuración del Equipo</span>
                 </button>
               </Link>
 
               <Link href="/profile#teams" onClick={() => setShowDropdown(false)}>
                 <button className="dropdown-item" style={{ color: 'var(--color-accent-mint)' }}>
-                  <Plus size={16} /> + Unirse a otro equipo
+                  <Plus size={16} /> <span>Unirse a otro equipo</span>
                 </button>
               </Link>
 
               <button className="dropdown-item" onClick={() => { setLocation('/profile#billing'); setShowDropdown(false); }}>
-                <CreditCard size={16} /> Planes y Facturación
+                <CreditCard size={16} /> <span>Planes y Facturación</span>
               </button>
 
-              <div style={{ height: '1px', background: 'var(--color-border)', margin: '5px 0' }}></div>
+              <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '8px 12px' }}></div>
               
-              <button className="dropdown-item danger" onClick={handleLogout}>
-                <LogOut size={16} /> Cerrar Sesión
+              <button className="dropdown-item danger" onClick={handleLogout} style={{ marginBottom: '4px' }}>
+                <LogOut size={16} /> <span>Cerrar Sesión</span>
               </button>
             </div>
           )}
