@@ -111,6 +111,37 @@ export default function OrganizationSettings() {
             </div>
           </div>
         )}
+
+        {/* Sección de Código de Acceso (Permanente) */}
+        <div style={{ 
+          background: 'rgba(28, 37, 65, 0.4)', 
+          padding: '20px', 
+          borderRadius: '16px', 
+          marginTop: '25px',
+          border: '1px dashed var(--color-border)',
+          textAlign: 'center'
+        }}>
+          <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            Código de Acceso del Equipo
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px' }}>
+            <span style={{ 
+              fontSize: '1.8rem', 
+              fontWeight: '800', 
+              color: 'var(--color-accent-mint)', 
+              letterSpacing: '2px',
+              fontFamily: 'monospace'
+            }}>
+              {activeOrganization.join_code || '---'}
+            </span>
+            <button className="outline" style={{ padding: '8px 12px', fontSize: '0.8rem' }} onClick={() => navigator.clipboard.writeText(activeOrganization.join_code)}>
+              Copiar Código
+            </button>
+          </div>
+          <p style={{ margin: '10px 0 0 0', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+            Los nuevos miembros pueden unirse ingresando este código al iniciar sesión.
+          </p>
+        </div>
         
         {loading ? (
           <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>

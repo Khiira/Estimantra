@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { insforge } from '../lib/insforge';
 import { ChevronRight, ChevronDown, Plus, Trash2, Clock, AlignLeft, DollarSign } from 'lucide-react';
 
-export default function TaskTree({ tasks, roles, projectId, version, onTasksChange, onTotalsChange }: any) {
+export default function TaskTree({ tasks, roles, projectId, version, onTasksChange, onTotalsChange, readOnly }: any) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [editingDetailsId, setEditingDetailsId] = useState<string | null>(null);
   const [addingTaskTo, setAddingTaskTo] = useState<string | null>(null);
@@ -70,6 +70,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
   };
 
   const handleCreateTask = async (parentId: string | null) => {
+    if (readOnly) return;
     // Guard against double-submit (Enter key fires submit, then onBlur also fires)
     if (isSubmitting.current) return;
     if (!newTaskName.trim()) {
@@ -113,6 +114,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
 
 
   const handleUpdateTask = (id: string, field: string, value: any) => {
+    if (readOnly) return;
     // 1. Actualización optimista local
     const updatedTasks = tasks.map((t: any) => 
       t.id === id ? { ...t, [field]: value } : t
@@ -131,6 +133,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    if (readOnly) return;
     if(!confirm("¿Eliminar tarea y todas sus subtareas?")) return;
     const { error } = await insforge.database.from('tasks').delete().eq('id', id);
     if (!error) {
@@ -155,7 +158,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
 
     return (
       <div key={node.id} className="task-node-wrapper">
-        <div className={`task-node depth-${depth}`} style={{ paddingLeft: `${depth * 25}px` }}>
+        <div className={`task-node depth-${depth}`} style={{ paddingLeft: `${depth * 25}px`, opacity: readOnly && !hasChildren ? 0.6 : 1 }}>
           
           <div className="task-left" onClick={() => toggleExpand(node.id)}>
             {hasChildren ? (
@@ -177,12 +180,14 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
                   min="0"
                   step="0.5"
                   className="hours-input" 
+                  disabled={readOnly}
                   value={node.estimated_hours || ''} 
                   placeholder="0 h"
                   onChange={e => handleUpdateTask(node.id, 'estimated_hours', Number(e.target.value) || 0)} 
                 />
                 <select 
                   className="role-select" 
+                  disabled={readOnly}
                   value={node.assigned_role_id || ''} 
                   onChange={e => handleUpdateTask(node.id, 'assigned_role_id', e.target.value)}
                 >
@@ -216,14 +221,16 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
               </div>
             )}
 
-            <div className="task-actions">
-              <button className="icon-btn tiny text-button" title="Añadir subtarea" onClick={(e) => { e.stopPropagation(); setAddingTaskTo(node.id); }}>
-                <Plus size={14} />
-              </button>
-              <button className="icon-btn tiny danger" title="Eliminar" onClick={(e) => handleDelete(e, node.id)}>
-                <Trash2 size={14} />
-              </button>
-            </div>
+            {!readOnly && (
+              <div className="task-actions">
+                <button className="icon-btn tiny text-button" title="Añadir subtarea" onClick={(e) => { e.stopPropagation(); setAddingTaskTo(node.id); }}>
+                  <Plus size={14} />
+                </button>
+                <button className="icon-btn tiny danger" title="Eliminar" onClick={(e) => handleDelete(e, node.id)}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -232,6 +239,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
           <div className="task-details-panel" style={{ marginLeft: `${depth * 25 + 32}px` }}>
             <textarea 
               placeholder="Descripción opcional de cómo se ejecutará esta tarea..."
+              readOnly={readOnly}
               value={node.description || ''}
               onChange={e => handleUpdateTask(node.id, 'description', e.target.value)}
               rows={2}
@@ -239,7 +247,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
           </div>
         )}
 
-        {addingTaskTo === node.id && (
+        {addingTaskTo === node.id && !readOnly && (
           <div className="add-task-inline" style={{ paddingLeft: `${(depth + 1) * 25 + 24}px` }}>
             <input 
               autoFocus

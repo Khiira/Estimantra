@@ -2,8 +2,10 @@ import { Route, Switch, useLocation } from 'wouter';
 import { SessionProvider, useSession } from './auth/SessionContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Profile from './pages/Profile';
 import ProjectEstimator from './pages/ProjectEstimator';
 import OrganizationSettings from './pages/OrganizationSettings';
+import Navigation from './components/Navigation';
 import { useEffect } from 'react';
 
 // Interceptar tokens de invitación mágicos desde la URL
@@ -14,7 +16,7 @@ if (inviteToken) {
   window.history.replaceState({}, '', window.location.pathname);
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useSession();
   const [, setLocation] = useLocation();
 
@@ -36,27 +38,37 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
-  return <>{children}</>;
+  return (
+    <>
+      <Navigation />
+      {children}
+    </>
+  );
 }
 
 function AppRouter() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/profile">
+        <ProtectedLayout>
+          <Profile />
+        </ProtectedLayout>
+      </Route>
       <Route path="/organization">
-        <ProtectedRoute>
+        <ProtectedLayout>
           <OrganizationSettings />
-        </ProtectedRoute>
+        </ProtectedLayout>
       </Route>
       <Route path="/">
-        <ProtectedRoute>
+        <ProtectedLayout>
           <Dashboard />
-        </ProtectedRoute>
+        </ProtectedLayout>
       </Route>
       <Route path="/project/:id">
-        <ProtectedRoute>
+        <ProtectedLayout>
           <ProjectEstimator />
-        </ProtectedRoute>
+        </ProtectedLayout>
       </Route>
     </Switch>
   );

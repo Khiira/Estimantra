@@ -5,10 +5,12 @@ import { ArrowLeft, Plus, Check } from 'lucide-react';
 import { Link } from 'wouter';
 import TaskTree from '../components/TaskTree';
 import ProposalBuilder from '../components/ProposalBuilder';
+import { useSession } from '../auth/SessionContext';
 
 export default function ProjectEstimator() {
   const [, params] = useRoute('/project/:id');
   const projectId = params?.id || '';
+  const { user } = useSession();
   
   const [project, setProject] = useState<any>(null);
   const [roles, setRoles] = useState<any[]>([]);
@@ -22,6 +24,10 @@ export default function ProjectEstimator() {
   
   const [activeTab, setActiveTab] = useState<'estimator' | 'proposal'>('estimator');
   
+  // Real-time & Locking
+  const [editorUser, setEditorUser] = useState<{ id: string, name: string } | null>(null);
+  const [lockTimeout, setLockTimeout] = useState<any>(null);
+
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleCost, setNewRoleCost] = useState('');
@@ -30,6 +36,7 @@ export default function ProjectEstimator() {
 
   const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (editorUser) return; // Locked
     if (!newRoleName.trim()) return;
     let finalName = newRoleName;
     if (selectedMemberId && selectedMemberId !== 'generic') {
@@ -56,10 +63,75 @@ export default function ProjectEstimator() {
   };
 
   useEffect(() => {
+    let realtimeCleanup: (() => void) | undefined;
+
     if (projectId) {
       loadWorkspace();
+      setupProjectRealtime().then(cleanup => {
+        realtimeCleanup = cleanup;
+      });
     }
+    
+    return () => {
+      if (realtimeCleanup) realtimeCleanup();
+      if (projectId) {
+        insforge.realtime.unsubscribe(`project:${projectId}`);
+      }
+    };
   }, [projectId, selectedVersion]);
+
+  const setupProjectRealtime = async () => {
+    if (!projectId) return;
+    
+    await insforge.realtime.connect();
+    await insforge.realtime.subscribe(`project:${projectId}`);
+    
+    // Heartbeat de presencia (avisar que estoy editando)
+    const heartbeat = setInterval(() => {
+      insforge.realtime.publish(`project:${projectId}`, 'presence:editing', {
+        name: user?.full_name || user?.email || 'Compañero'
+      });
+    }, 5000);
+
+    const handleDataChange = () => {
+      loadWorkspace(); // Recargar datos al recibir notificación
+    };
+    
+    const handlePresence = (payload: any) => {
+      if (payload.meta.senderId === user?.id) return;
+      
+      setEditorUser({ id: payload.meta.senderId, name: payload.name });
+      
+      // Limpiar el aviso si no recibimos heartbeat en 10s
+      setEditorUser(prev => {
+        if (lockTimeout) clearTimeout(lockTimeout);
+        const timeout = setTimeout(() => {
+           setEditorUser(null);
+        }, 12000);
+        setLockTimeout(timeout);
+        return prev;
+      });
+    };
+
+    insforge.realtime.on('presence:editing', handlePresence);
+    insforge.realtime.on('UPDATE_task', handleDataChange);
+    insforge.realtime.on('INSERT_task', handleDataChange);
+    insforge.realtime.on('DELETE_task', handleDataChange);
+    insforge.realtime.on('UPDATE_project_role', handleDataChange);
+    insforge.realtime.on('INSERT_project_role', handleDataChange);
+    insforge.realtime.on('DELETE_project_role', handleDataChange);
+
+    return () => {
+      clearInterval(heartbeat);
+      insforge.realtime.off('presence:editing', handlePresence);
+      insforge.realtime.off('UPDATE_task', handleDataChange);
+      insforge.realtime.off('INSERT_task', handleDataChange);
+      insforge.realtime.off('DELETE_task', handleDataChange);
+      insforge.realtime.off('UPDATE_project_role', handleDataChange);
+      insforge.realtime.off('INSERT_project_role', handleDataChange);
+      insforge.realtime.off('DELETE_project_role', handleDataChange);
+    };
+  };
 
   // Effect 1 — show skeleton when version changes (after initial load)
   useEffect(() => {
@@ -232,12 +304,21 @@ export default function ProjectEstimator() {
 
   if (loading) {
     return (
-      <div className="estimator-workspace animate-fade-in">
-        <header className="workspace-header">
-           <div className="skeleton title-skeleton"></div>
-           <div className="skeleton totals-skeleton"></div>
-        </header>
-        <div className="workspace-grid loading-grid">
+      <div className="estimator-workspace">
+        <div className="breadcrumb-bar" style={{ borderBottom: '1px solid var(--color-border)' }}>
+          <div className="title-area">
+             <div className="skeleton" style={{ width: '40px', height: '40px', borderRadius: '50%' }}></div>
+             <div className="skeleton" style={{ width: '250px', height: '30px', borderRadius: '8px' }}></div>
+          </div>
+          <div className="skeleton header-totals" style={{ width: '400px', height: '70px', border: 'none' }}></div>
+        </div>
+        
+        <div className="workspace-tabs">
+           <div className="skeleton" style={{ width: '200px', height: '40px', margin: '10px 0' }}></div>
+           <div className="skeleton" style={{ width: '200px', height: '40px', margin: '10px 0' }}></div>
+        </div>
+
+        <div className="workspace-grid loading-grid" style={{ paddingTop: '30px' }}>
            <aside className="skeleton roles-skeleton"></aside>
            <main className="skeleton tasks-skeleton"></main>
         </div>
@@ -251,19 +332,25 @@ export default function ProjectEstimator() {
 
   return (
     <div className="estimator-workspace">
-      <header className="workspace-header">
+      {editorUser && (
+        <div className="lock-banner animate-fade-in">
+           <span>⚠️ El usuario <strong>{editorUser.name}</strong> está editando esta versión. Tus controles están deshabilitados temporalmente.</span>
+        </div>
+      )}
+      
+      <div className="breadcrumb-bar animate-fade-in">
         <div className="title-area">
           <Link href="/">
             <button className="icon-btn tooltip" title="Volver al inicio">
-              <ArrowLeft size={20} />
+              <ArrowLeft size={18} />
             </button>
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <div>
-              <h2>{project.name}</h2>
+              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>{project.name}</h2>
               <div className="project-meta">
                 {project.category && <span className="category-tag">{project.category}</span>}
-                {project.clients?.name && <span className="client-tag">Cliente: {project.clients.name}</span>}
+                {project.clients?.name && <span className="client-tag">{project.clients.name}</span>}
               </div>
             </div>
 
@@ -272,17 +359,17 @@ export default function ProjectEstimator() {
                  className="version-select"
                  value={selectedVersion}
                  onChange={(e) => setSelectedVersion(e.target.value)}
-                 disabled={isVersioning || loadingTasks}
-                 title="Seleccionar versión de estimación"
+                 disabled={isVersioning || loadingTasks || !!editorUser}
+                 title="Seleccionar versión"
                >
                  {allVersions.map(v => <option key={v} value={v}>v{v}</option>)}
                </select>
                <button 
-                 className="icon-btn tiny accent-btn" 
+                 className="accent-btn" 
                  onClick={handleCreateNewVersion}
-                 disabled={isVersioning}
-                 title="Crear nueva versión (+0.1)"
-                 style={{ padding: '4px 10px', fontSize: '0.75rem', height: 'auto', borderRadius: '4px', fontWeight: 600 }}
+                 disabled={isVersioning || !!editorUser}
+                 title="Crear nueva versión"
+                 style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px' }}
                >
                  {isVersioning ? '...' : '+ Versión'}
                </button>
@@ -292,24 +379,6 @@ export default function ProjectEstimator() {
         
         <div className="header-totals">
           <div className="total-item">
-            <p className="total-label">Jornada</p>
-            <div className="jornada-control">
-              <input 
-                id="hours_per_day"
-                type="number" 
-                step="0.5" 
-                value={project.hours_per_day || 8} 
-                onChange={async (e) => {
-                  const val = Number(e.target.value) || 8;
-                  setProject({ ...project, hours_per_day: val });
-                  await insforge.database.from('projects').update({ hours_per_day: val }).eq('id', project.id);
-                }}
-                className="jornada-input"
-              />
-              <label htmlFor="hours_per_day" className="jornada-suffix">h/día</label>
-            </div>
-          </div>
-          <div className="total-item border-left">
             <p className="total-label">Días Totales</p>
             <h3 className="total-value highlight-text">
               {(grandTotals.hours / (project.hours_per_day || 8)).toFixed(1)}d
@@ -326,7 +395,7 @@ export default function ProjectEstimator() {
             </h3>
           </div>
         </div>
-      </header>
+      </div>
 
       <div className="workspace-tabs animate-fade-in">
           <button className={`tab-btn ${activeTab === 'estimator' ? 'active' : ''}`} onClick={() => setActiveTab('estimator')}>Ingeniería (Matemática Automática)</button>
@@ -334,13 +403,15 @@ export default function ProjectEstimator() {
       </div>
 
       {activeTab === 'estimator' ? (
-      <div className="workspace-grid">
+      <div className="workspace-grid" style={{ opacity: editorUser ? 0.7 : 1 }}>
         <aside className="roles-panel animate-fade-in">
           <div className="panel-header">
             <h3>Perfiles Técnicos</h3>
-            <button className="icon-btn text-button" title="Añadir rol" onClick={() => setShowRoleForm(!showRoleForm)}>
-              <Plus size={16}/>
-            </button>
+            {!editorUser && (
+              <button className="icon-btn text-button" title="Añadir rol" onClick={() => setShowRoleForm(!showRoleForm)}>
+                <Plus size={16}/>
+              </button>
+            )}
           </div>
           
           {showRoleForm && (
@@ -421,6 +492,7 @@ export default function ProjectEstimator() {
                 projectId={projectId} 
                 version={selectedVersion}
                 onTasksChange={setTasks} 
+                readOnly={!!editorUser}
               />
             )}
           </div>
@@ -435,16 +507,24 @@ export default function ProjectEstimator() {
 
       <style>{`
         .estimator-workspace {
-          min-height: 100vh;
+          min-height: calc(100vh - 70px);
           display: flex;
           flex-direction: column;
         }
-        .workspace-header {
+        .lock-banner {
+          background: rgba(255, 171, 0, 0.1);
+          color: #ffab00;
+          padding: 8px 40px;
+          text-align: center;
+          font-size: 0.9rem;
+          border-bottom: 1px solid rgba(255, 171, 0, 0.2);
+        }
+        .breadcrumb-bar {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 20px 40px;
-          background: var(--color-bg-secondary);
+          padding: 15px 40px;
+          background: rgba(255,255,255,0.02);
           border-bottom: 1px solid var(--color-border);
         }
         .title-area {

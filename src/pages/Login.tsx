@@ -1,37 +1,90 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { insforge } from '../lib/insforge';
-import { LogIn, UserPlus } from 'lucide-react';
+import { LogIn, UserPlus, ShieldCheck, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
+  const [verificationMode, setVerificationMode] = useState(false);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [otp, setOtp] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  // Verificación automática al llegar a 6 dígitos
+  useEffect(() => {
+    if (otp.length === 6 && verificationMode) {
+      handleVerify();
+    }
+  }, [otp, verificationMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setMessage(null);
     try {
       if (isLogin) {
         const { error } = await insforge.auth.signInWithPassword({ email, password });
         if (error) throw error;
         window.location.href = '/'; // Full reload
       } else {
-        const { error } = await insforge.auth.signUp({
+        const { data, error } = await insforge.auth.signUp({
           email,
           password,
           name
         });
         if (error) throw error;
-        window.location.href = '/'; // Full reload
+        
+        if (data?.requireEmailVerification) {
+          setVerificationMode(true);
+          setMessage('Hemos enviado un código a tu correo.');
+        } else {
+          window.location.href = '/'; // Full reload
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Ocurrió un error.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { error } = await insforge.auth.verifyEmail({
+        email,
+        otp
+      });
+      if (error) throw error;
+      window.location.href = '/';
+    } catch (err: any) {
+      setError(err.message || 'Código inválido o expirado.');
+      setOtp(''); // Reset OTP on error to try again
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { error } = await insforge.auth.resendVerificationEmail({
+        email,
+        redirectTo: window.location.origin + '/login'
+      });
+      if (error) throw error;
+      setMessage('Código reenviado con éxito.');
+    } catch (err: any) {
+      setError(err.message || 'No se pudo reenviar el código.');
     } finally {
       setLoading(false);
     }
@@ -49,6 +102,136 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  if (verificationMode) {
+    return (
+      <div className="login-wrapper">
+        <div className="login-card animate-fade-in" style={{ 
+          textAlign: 'center', 
+          maxWidth: '450px', 
+          padding: '40px',
+          background: 'rgba(28, 37, 65, 0.98)', 
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(72, 229, 194, 0.25)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+        }}>
+          <div className="verification-icon-container">
+            <ShieldCheck size={48} />
+          </div>
+          <h1 className="logo" style={{ fontSize: '2rem', marginBottom: '8px' }}>Verifica tu Correo</h1>
+          <p className="subtitle" style={{ fontSize: '0.95rem', marginBottom: '24px' }}>
+            Protegemos tu cuenta. Introduce el código enviado a:<br/>
+            <span className="email-highlight">{email}</span>
+          </p>
+          
+          {error && <div className="error-box animate-shake">{error}</div>}
+          {message && <div className="message-box-simple">{message}</div>}
+
+          <div className="otp-container">
+            <input 
+              type="text" 
+              placeholder="0 0 0 0 0 0" 
+              value={otp} 
+              onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="otp-input"
+              disabled={loading}
+              autoFocus
+            />
+            <div className="otp-helper-text">El código expira en pocos minutos</div>
+          </div>
+
+          <button 
+            onClick={handleVerify} 
+            className="primary" 
+            disabled={loading || otp.length < 6}
+            style={{ width: '100%', padding: '16px', fontSize: '1.1rem' }}
+          >
+            {loading ? <RefreshCw className="animate-spin" /> : 'Confirmar Identidad'}
+          </button>
+
+          <footer className="verification-footer">
+            <button onClick={handleResendCode} className="text-button flex-center" disabled={loading}>
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> No recibí el código, reenviar
+            </button>
+            <button onClick={() => setVerificationMode(false)} className="text-button flex-center" style={{ color: 'var(--color-text-secondary)' }}>
+              <ArrowLeft size={14} /> Usar otro correo
+            </button>
+          </footer>
+
+          <style>{`
+            .verification-icon-container {
+              display: inline-flex;
+              padding: 24px;
+              background: linear-gradient(135deg, rgba(72, 229, 194, 0.15), rgba(72, 229, 194, 0.05));
+              border-radius: 24px;
+              margin-bottom: 24px;
+              color: var(--color-accent-mint);
+              box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+              border: 1px solid rgba(72, 229, 194, 0.1);
+            }
+            .email-highlight {
+              color: var(--color-accent-mint);
+              font-weight: 600;
+              opacity: 0.95;
+            }
+            .message-box-simple {
+              background: rgba(72, 229, 194, 0.08);
+              color: var(--color-accent-mint);
+              padding: 14px;
+              border-radius: 12px;
+              font-size: 0.9rem;
+              margin-bottom: 24px;
+              border: 1px solid rgba(72, 229, 194, 0.15);
+            }
+            .otp-container {
+              margin-bottom: 32px;
+            }
+            .otp-input {
+              width: 100%;
+              background: rgba(0,0,0,0.2) !important;
+              border: 2px solid var(--color-border) !important;
+              border-radius: 16px !important;
+              font-size: 2.8rem !important;
+              letter-spacing: 12px !important;
+              font-weight: 800 !important;
+              padding: 20px !important;
+              text-align: center !important;
+              color: var(--color-accent-mint) !important;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            }
+            .otp-input:focus {
+              border-color: var(--color-accent-mint) !important;
+              box-shadow: 0 0 30px rgba(72, 229, 194, 0.12) !important;
+              outline: none !important;
+              transform: scale(1.02);
+            }
+            .otp-helper-text {
+              margin-top: 14px;
+              font-size: 0.85rem;
+              color: var(--color-text-secondary);
+              opacity: 0.8;
+            }
+            .verification-footer {
+              margin-top: 36px;
+              display: flex;
+              flex-direction: column;
+              gap: 14px;
+              align-items: center;
+            }
+            .animate-shake {
+              animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+            }
+            @keyframes shake {
+              10%, 90% { transform: translate3d(-1px, 0, 0); }
+              20%, 80% { transform: translate3d(2px, 0, 0); }
+              30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+              40%, 60% { transform: translate3d(4px, 0, 0); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="login-wrapper">

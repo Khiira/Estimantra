@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSession } from '../auth/SessionContext';
 import { insforge } from '../lib/insforge';
 import { Link, useLocation } from 'wouter';
-import { FileText, Plus, FolderPlus, Building } from 'lucide-react';
+import { FileText, Plus, FolderPlus, Building, RefreshCw, ArrowLeft, MoreVertical, Edit2, Trash } from 'lucide-react';
 
 export default function Dashboard() {
-  const { user, activeOrganization, setActiveOrganization, myOrganizations } = useSession();
+  const { user, activeOrganization, setActiveOrganization } = useSession();
   const [, setLocation] = useLocation();
+  const [onboardingMode, setOnboardingMode] = useState<'selection' | 'create' | 'join'>('selection');
 
+  // Estado para menú de acciones en cards
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  
   // Estados de carga
   const [loadingProjects, setLoadingProjects] = useState(false);
   
@@ -15,8 +19,22 @@ export default function Dashboard() {
   const [projects, setProjects] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [editingProject, setEditingProject] = useState<any | null>(null);
   const [newOrgName, setNewOrgName] = useState('');
   
+  // Filtros y Búsqueda
+  const [filterClient, setFilterClient] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
+
+  // Obtener categorías únicas dinámicamente
+  const uniqueCategories = useMemo(() => {
+    const cats = projects
+      .map(p => p.category)
+      .filter((c): c is string => !!c && c.trim() !== '');
+    return Array.from(new Set(cats)).sort();
+  }, [projects]);
+
   // Formulario nuevo proyecto
   const [projName, setProjName] = useState('');
   const [projCategory, setProjCategory] = useState('');
@@ -30,13 +48,47 @@ export default function Dashboard() {
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   useEffect(() => {
+    let realtimeCleanup: (() => void) | undefined;
     const inviteToken = localStorage.getItem('estimantra_invite');
+
     if (inviteToken && user) {
       processInvite(inviteToken);
     } else if (activeOrganization) {
       loadDashboardData();
+      setupRealtime().then(cleanup => {
+        realtimeCleanup = cleanup;
+      });
     }
+    
+    return () => {
+      if (realtimeCleanup) realtimeCleanup();
+      if (!activeOrganization) {
+        insforge.realtime.unsubscribe(`org:${activeOrganization?.id}`);
+      }
+    };
   }, [activeOrganization, user]);
+
+  const setupRealtime = async () => {
+    if (!activeOrganization) return;
+    
+    await insforge.realtime.connect();
+    await insforge.realtime.subscribe(`org:${activeOrganization.id}`);
+    
+    // Escuchar cambios en la tabla de proyectos vía Realtime
+    const handleProjectChange = () => {
+      loadDashboardData(); // Recargar datos al recibir notificación
+    };
+    
+    insforge.realtime.on('INSERT_project', handleProjectChange);
+    insforge.realtime.on('UPDATE_project', handleProjectChange);
+    insforge.realtime.on('DELETE_project', handleProjectChange);
+
+    return () => {
+      insforge.realtime.off('INSERT_project', handleProjectChange);
+      insforge.realtime.off('UPDATE_project', handleProjectChange);
+      insforge.realtime.off('DELETE_project', handleProjectChange);
+    };
+  };
 
   const processInvite = async (token: string) => {
     setProcessingInvite(true);
@@ -86,13 +138,13 @@ export default function Dashboard() {
   };
 
   const loadDashboardData = async () => {
+    if (!activeOrganization) return;
     setLoadingProjects(true);
     // Cargar Proyectos con info de Cliente si existe
     const { data: projData } = await insforge.database
       .from('projects')
       .select('*, clients(name)')
-      .eq('org_id', activeOrganization.id) // <- Solo los de la organizacion activa
-      .order('created_at', { ascending: false });
+      .eq('org_id', activeOrganization.id);
     
     // Cargar clientes
     const { data: cliData } = await insforge.database
@@ -108,35 +160,23 @@ export default function Dashboard() {
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newOrgName.trim()) return;
-
     const newOrgId = crypto.randomUUID();
-
-    // 1. Crear Org indicando el ID manualmente para no depender del SELECT
     const { error: orgErr } = await insforge.database
       .from('organizations')
       .insert([{ id: newOrgId, name: newOrgName }]);
-
     if (orgErr) { alert('Error creando la organización: ' + orgErr.message); return; }
-
-    // 2. Insertarse a sí mismo como admin
     const { error: memErr } = await insforge.database
       .from('organization_members')
       .insert([{ org_id: newOrgId, user_id: user.id, role: 'admin' }]);
-      
     if (memErr) { alert('Error uniendo usuario a la org: ' + memErr.message); return; }
-
     setActiveOrganization({ id: newOrgId, name: newOrgName });
-    // Reload causes session context to refetch all myOrganizations
     window.location.reload();
   };
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeOrganization) return;
-
     let clientId = null;
-    
-    // Si se escribió un nombre de cliente que no existe, lo creamos dinámicamente
     if (projClientName.trim()) {
       const existingClient = clients.find(c => c.name.toLowerCase() === projClientName.toLowerCase());
       if (existingClient) {
@@ -150,36 +190,121 @@ export default function Dashboard() {
         if (newClient) clientId = newClient.id;
       }
     }
-
-    const { data, error } = await insforge.database
-      .from('projects')
-      .insert([{ 
-        org_id: activeOrganization.id,
-        name: projName, 
-        category: projCategory || null,
-        client_id: clientId,
-        billing_mode: billingMode,
-        flat_hourly_rate: flatHourlyRate ? Number(flatHourlyRate) : 0,
-        hours_per_day: Number(hoursPerDay) || 8
-      }])
-      .select()
-      .single();
-
-    if (error) {
-      alert(`Error al crear proyecto: ${error.message}`);
-      return;
+    if (editingProject) {
+      const { error } = await insforge.database
+        .from('projects')
+        .update({ 
+          name: projName, 
+          category: projCategory || null,
+          client_id: clientId,
+          hours_per_day: Number(hoursPerDay) || 8
+        })
+        .eq('id', editingProject.id);
+      if (error) { alert(`Error al actualizar proyecto: ${error.message}`); return; }
+    } else {
+      const { data, error } = await insforge.database
+        .from('projects')
+        .insert([{ 
+          org_id: activeOrganization.id,
+          name: projName, 
+          category: projCategory || null,
+          client_id: clientId,
+          billing_mode: billingMode,
+          flat_hourly_rate: flatHourlyRate ? Number(flatHourlyRate) : 0,
+          hours_per_day: Number(hoursPerDay) || 8
+        }])
+        .select()
+        .single();
+      if (error) { alert(`Error al crear proyecto: ${error.message}`); return; }
+      setLocation(`/project/${data.id}`);
     }
-
     setShowModal(false);
-    setLocation(`/project/${data.id}`);
+    setEditingProject(null);
+    loadDashboardData();
   };
 
-  // PANTALLA SETUP: Si no hay organización, fuerza a crearla
+  const handleDeleteProject = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar esta estimación? Se borrarán todas las tareas y versiones asociadas.')) return;
+    const { error } = await insforge.database.from('projects').delete().eq('id', id);
+    if (error) { alert('Error al eliminar: ' + error.message); } else { setProjects(projects.filter(p => p.id !== id)); }
+  };
+
+  const openEditModal = (project?: any) => {
+    if (project && project.id) {
+      // Editar proyecto existente
+      setEditingProject(project);
+      setProjName(project.name || '');
+      setProjCategory(project.category || '');
+      setProjClientName(project.clients?.name || '');
+      setBillingMode(project.billing_mode || 'by_role');
+      setFlatHourlyRate(project.flat_hourly_rate?.toString() || '');
+      setHoursPerDay(project.hours_per_day?.toString() || '8');
+    } else {
+      // Nuevo proyecto — limpiar formulario
+      setEditingProject(null);
+      setProjName('');
+      setProjCategory('');
+      setProjClientName('');
+      setBillingMode('by_role');
+      setFlatHourlyRate('');
+      setHoursPerDay('8');
+    }
+    setShowModal(true);
+  };
+
+  const filteredProjects = useMemo(() => {
+    let result = [...projects];
+    if (filterClient !== 'all') result = result.filter(p => p.client_id === filterClient);
+    if (filterCategory !== 'all') result = result.filter(p => p.category === filterCategory);
+    
+    result.sort((a, b) => {
+      const dateA = new Date(a.updated_at).getTime();
+      const dateB = new Date(b.updated_at).getTime();
+      return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+    return result;
+  }, [projects, filterClient, filterCategory, sortBy]);
+
+  // Lógica de Unión por Código
+  const [joinCode, setJoinCode] = useState('');
+  const [joining, setJoining] = useState(false);
+
+  const handleJoinByCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!joinCode.trim()) return;
+    setJoining(true);
+    try {
+      const { data: org, error: orgErr } = await insforge.database
+        .from('organizations')
+        .select('id, name')
+        .eq('join_code', joinCode.toUpperCase())
+        .single();
+
+      if (orgErr || !org) throw new Error('El código no es válido o la organización ya no existe.');
+
+      const { error: memErr } = await insforge.database
+        .from('organization_members')
+        .insert([{ org_id: org.id, user_id: user.id, role: 'member' }]);
+
+      if (memErr) throw new Error('Error al unirse: ' + memErr.message);
+
+      setActiveOrganization(org);
+      window.location.reload();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  // PANTALLA SETUP: Si no hay organización, fuerza a crearla o unirse
   if (processingInvite) {
     return (
       <div className="container flex-column-center-vh">
-        <h2>Autenticando Invitación Mágica...</h2>
-        <p>Uniéndote a la organización colaborativa de manera segura.</p>
+        <div className="onboarding-card animate-pulse">
+          <RefreshCw size={48} className="animate-spin" color="var(--color-accent-mint)" />
+          <h2 style={{ marginTop: '20px' }}>Validando invitación...</h2>
+        </div>
       </div>
     );
   }
@@ -187,10 +312,10 @@ export default function Dashboard() {
   if (inviteError) {
     return (
       <div className="container flex-column-center-vh">
-        <div className="auth-box auth-box-danger">
-          <h2 className="error-title">Error con la Invitación</h2>
+        <div className="auth-box auth-box-danger animate-fade-in">
+          <h2 className="error-title">Error de Invitación</h2>
           <p>{inviteError}</p>
-          <button className="primary" onClick={() => { setInviteError(null); loadDashboardData(); }}>Volver al Panel</button>
+          <button className="primary" onClick={() => { setInviteError(null); loadDashboardData(); }}>Ir al Panel</button>
         </div>
       </div>
     );
@@ -199,242 +324,523 @@ export default function Dashboard() {
   if (!activeOrganization && !loadingProjects) {
     return (
       <div className="container flex-column-center-vh">
-        <div className="auth-box">
-          <Building size={48} color="var(--color-accent-mint)" className="setup-icon" />
-          <h2 className="setup-title">Inicia tu Espacio de Trabajo</h2>
-          <p className="setup-subtitle">Estimantra ahora es colaborativo. Crea la organización compartida para tu agencia o equipo antes de comenzar.</p>
-          
-          <form onSubmit={handleCreateOrganization} className="setup-form">
-            <input type="text" placeholder="Nombre de la Agencia (Ej: Diseño Acme)" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} required autoFocus />
-            <button type="submit" className="primary">Crear Organización</button>
-          </form>
-        </div>
+        {onboardingMode === 'selection' && (
+          <div className="onboarding-selection animate-fade-in">
+            <header className="onboarding-header">
+              <h1 className="title-gradient" style={{ fontSize: '2.8rem', marginBottom: '10px' }}>Bienvenido a Estimantra</h1>
+              <p style={{ fontSize: '1.1rem', color: 'var(--color-text-secondary)' }}>Elige cómo quieres empezar a colaborar hoy.</p>
+            </header>
+            
+            <div className="onboarding-grid" style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+              gap: '24px', 
+              width: '100%',
+              justifyContent: 'center',
+              maxWidth: '900px'
+            }}>
+              <div className="onboarding-option-card" onClick={() => setOnboardingMode('create')} style={{ padding: '35px 30px' }}>
+                <div className="option-icon" style={{ width: '60px', height: '60px' }}>
+                  <Building size={28} />
+                </div>
+                <h3>Crear Equipo</h3>
+                <p>Crea un nuevo espacio de trabajo profesional para centralizar tus proyectos y equipo.</p>
+                <div className="option-footer" style={{ marginTop: 'auto', fontWeight: 'bold', color: 'var(--color-accent-mint)', background: 'transparent', border: 'none', padding: 0 }}>Crear ahora →</div>
+              </div>
+
+              <div className="onboarding-option-card" onClick={() => setOnboardingMode('join')}>
+                <div className="option-icon" style={{ color: 'var(--color-text-secondary)', background: 'rgba(255,255,255,0.05)' }}>
+                  <FolderPlus size={32} />
+                </div>
+                <h3>Unirme a Equipo</h3>
+                <p>¿Tienes un código de invitación? Ingrésalo para sumarte a un espacio existente.</p>
+                <div className="option-footer" style={{ marginTop: 'auto', fontWeight: 'bold', color: 'var(--color-text-secondary)', background: 'transparent', border: 'none', padding: 0 }}>Ingresar código →</div>
+              </div>
+            </div>
+            
+            {activeOrganization && (
+              <button 
+                onClick={() => setLocation('/')} 
+                style={{ marginTop: '50px', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', padding: '12px 24px', borderRadius: '12px', cursor: 'pointer' }}
+              >
+                Volver al Panel Actual
+              </button>
+            )}
+          </div>
+        )}
+
+        {onboardingMode === 'create' && (
+          <div className="auth-box animate-fade-in" style={{ maxWidth: '480px', padding: '50px' }}>
+            <button className="back-link" onClick={() => setOnboardingMode('selection')} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ArrowLeft size={16} /> Volver
+            </button>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
+                <div className="option-icon" style={{ width: '80px', height: '80px' }}><Building size={40} /></div>
+            </div>
+            <h2 className="setup-title" style={{ fontSize: '2rem', textAlign: 'center' }}>Nuevo Equipo</h2>
+            <p className="setup-subtitle" style={{ textAlign: 'center', marginBottom: '40px', color: 'var(--color-text-secondary)' }}>Define el nombre representativo de tu equipo o empresa.</p>
+            <form onSubmit={handleCreateOrganization} className="setup-form">
+              <input 
+                type="text" 
+                placeholder="Nombre del equipo" 
+                value={newOrgName} 
+                onChange={e => setNewOrgName(e.target.value)} 
+                required 
+                autoFocus 
+                style={{ background: 'rgba(0,0,0,0.2)', padding: '18px 24px', borderRadius: '14px', fontSize: '1.1rem' }}
+              />
+              <button type="submit" className="primary" style={{ padding: '18px', fontSize: '1.1rem', marginTop: '20px' }}>Crear Equipo</button>
+            </form>
+          </div>
+        )}
+
+        {onboardingMode === 'join' && (
+          <div className="auth-box animate-fade-in" style={{ maxWidth: '480px', padding: '50px' }}>
+            <button className="back-link" onClick={() => setOnboardingMode('selection')} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ArrowLeft size={16} /> Volver
+            </button>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
+                <div className="option-icon" style={{ width: '80px', height: '80px', color: 'var(--color-text-secondary)', background: 'rgba(255,255,255,0.05)' }}><FolderPlus size={40} /></div>
+            </div>
+            <h2 className="setup-title" style={{ fontSize: '2rem', textAlign: 'center' }}>Unirse a Equipo</h2>
+            <p className="setup-subtitle" style={{ textAlign: 'center', marginBottom: '40px', color: 'var(--color-text-secondary)' }}>Ingresa el código de 8 dígitos proporcionado por tu administrador.</p>
+            <form onSubmit={handleJoinByCode} className="setup-form">
+              <input 
+                type="text" 
+                placeholder="Código de acceso" 
+                value={joinCode} 
+                onChange={e => setJoinCode(e.target.value.toUpperCase())} 
+                required 
+                maxLength={8}
+                autoFocus 
+                style={{ 
+                    background: 'rgba(0,0,0,0.2)', padding: '18px', borderRadius: '14px', fontSize: '1.5rem',
+                    textAlign: 'center', letterSpacing: '8px', fontWeight: 'bold'
+                }}
+              />
+              <button type="submit" className="primary" disabled={joining} style={{ padding: '18px', fontSize: '1.1rem', marginTop: '20px' }}>
+                {joining ? 'Validando...' : 'Entrar al Equipo'}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="container dashboard-container">
-      <header className="dashboard-header animate-fade-in">
-        <div>
-          <div className="header-title-row">
-            <h2 className="title-gradient dashboard-title">Estimaciones</h2>
-            {myOrganizations && myOrganizations.length > 1 ? (
-              <select title="Organización"
-                className="org-select"
-                value={activeOrganization?.id || ''} 
-                onChange={(e) => setActiveOrganization(myOrganizations.find(o => o.id === e.target.value))}
-              >
-                {myOrganizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}
-              </select>
-            ) : (
-              <span className="active-org-name">- {activeOrganization?.name}</span>
-            )}
-          </div>
-          <p className="header-subtitle">Organiza integralmente a tus clientes y presupuestos.</p>
+      <div className="dashboard-toolbar animate-fade-in">
+        <div className="toolbar-info">
+          <h2 className="title-gradient">Mis Proyectos</h2>
+          <p>Gestiona tus presupuestos y clientes en un solo lugar.</p>
         </div>
-        <div className="header-actions">
-          <Link href="/organization">
-            <button className="outline"><Building size={18} className="btn-icon" /> Organización</button>
-          </Link>
-          <button className="primary" onClick={() => setShowModal(true)}>
-            <Plus size={18} /> Nuevo Proyecto
-          </button>
-        </div>
-      </header>
+        <button className="primary" onClick={() => openEditModal()}>
+          <Plus size={18} /> Nueva Estimación
+        </button>
+      </div>
 
-      <section className="projects-grid animate-fade-in" style={{ animationDelay: '0.1s' }}>
+      <div className="filter-bar animate-fade-in">
+        <div className="filters-group">
+          <select 
+            value={filterClient} 
+            onChange={e => setFilterClient(e.target.value)}
+            className="select-pill"
+          >
+            <option value="all">Clientes (Todos)</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+
+        <div className="filters-group">
+          <select 
+            value={filterCategory} 
+            onChange={e => setFilterCategory(e.target.value)}
+            className="select-pill"
+          >
+            <option value="all">Categorías (Todas)</option>
+            {uniqueCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+          </select>
+        </div>
+
+        <div className="filters-group">
+          <select 
+            value={sortBy} 
+            onChange={e => setSortBy(e.target.value as 'newest' | 'oldest')}
+            className="select-pill"
+          >
+            <option value="newest">Recientes</option>
+            <option value="oldest">Antiguos</option>
+          </select>
+        </div>
+      </div>
+
+      <section className="projects-grid">
         {loadingProjects ? (
-          <>
-            <div className="skeleton skeleton-card"></div>
-            <div className="skeleton skeleton-card"></div>
-            <div className="skeleton skeleton-card"></div>
-          </>
-        ) : projects.length === 0 ? (
-          <div className="empty-state">
-            <FolderPlus size={48} />
-            <h3>La organización no tiene proyectos</h3>
-            <p>Comienza creando tu primera estimación de proyecto.</p>
+          Array(3).fill(0).map((_, i) => <div key={i} className="skeleton-project" />)
+        ) : filteredProjects.length === 0 ? (
+          <div className="empty-state animate-fade-in" style={{ gridColumn: '1 / -1' }}>
+            <FolderPlus size={64} opacity={0.3} />
+            <h3>Sin proyectos activos</h3>
+            <p>Tu equipo aún no tiene estimaciones. ¡Crea la primera!</p>
+            <button className="outline" onClick={() => openEditModal()}>Empezar ahora</button>
           </div>
         ) : (
-          projects.map(p => {
-             const client = clients.find(c => c.id === p.client_id);
+          filteredProjects.map(p => {
              return (
-               <Link href={`/project/${p.id}`} key={p.id}>
-                 <div className="project-card">
-                   <div className="card-header">
-                     <FileText size={24} className="card-icon" />
-                     {p.category && <span className="category-badge">{p.category}</span>}
-                   </div>
-                   <h3>{p.name}</h3>
-                   {client && <p className="client-text">Cliente: {client.name}</p>}
-                   <p className="card-date">Modificado: {new Date(p.updated_at).toLocaleDateString()}</p>
-                 </div>
-               </Link>
-             );
+               <div key={p.id} className="project-wrapper animate-fade-in">
+                 <Link href={`/project/${p.id}`}>
+                    <div className="project-tile" onClick={() => setActiveMenuId(null)}>
+                      <div className="tile-top">
+                        <div className="tile-top-left">
+                          <div className="tile-icon">
+                            <FileText size={22} />
+                          </div>
+                          <div className="tile-title-premium">{p.name}</div>
+                        </div>
+
+                        <div className="tile-actions">
+                          <button 
+                            className="menu-dots-btn" 
+                            onClick={(e) => { 
+                              e.preventDefault(); 
+                              e.stopPropagation(); 
+                              setActiveMenuId(activeMenuId === p.id ? null : p.id); 
+                            }}
+                          >
+                            <MoreVertical size={20} />
+                          </button>
+
+                          {activeMenuId === p.id && (
+                            <div className="action-dropdown" onClick={e => e.stopPropagation()}>
+                              <button className="menu-item" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveMenuId(null); openEditModal(p); }}>
+                                <Edit2 size={14} /> Editar
+                              </button>
+                              <button className="menu-item delete" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveMenuId(null); handleDeleteProject(p.id); }}>
+                                <Trash size={14} /> Eliminar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="tile-category-pill">{p.category || 'GENERAL'}</div>
+                      
+                      <div className="tile-client">
+                        <Building size={14} /> {p.clients?.name || 'Cliente Particular'}
+                      </div>
+
+                      <div className="tile-footer">
+                        <div className="tile-date">Actividad: {new Date(p.updated_at).toLocaleDateString()}</div>
+                        <div className="tile-arrow">Ver →</div>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              );
           })
         )}
       </section>
 
-      {/* Modal Crear Estimación */}
+      {/* Modal Reestilizado */}
       {showModal && (
         <div className="modal-overlay animate-fade-in">
-          <div className="modal-box">
-            <h3>Nueva Estimación</h3>
-            <form onSubmit={handleCreateProject}>
+          <div className="modal-content animate-zoom-in">
+            <header className="modal-header">
+              <h3>{editingProject ? 'Editar Proyecto' : 'Nueva Estimación'}</h3>
+              <p>Completa los detalles fundamentales del presupuesto.</p>
+            </header>
+            
+            <form onSubmit={handleCreateProject} className="modal-form">
               <div className="form-group">
                 <label>Nombre del Proyecto</label>
                 <input type="text" required autoFocus value={projName} onChange={e => setProjName(e.target.value)} placeholder="Ej. Rediseño App Mobile" />
               </div>
-              <div className="form-group">
-                <label>Categoría (Opcional)</label>
-                <input type="text" value={projCategory} onChange={e => setProjCategory(e.target.value)} placeholder="Ej. Desarrollo, Marketing, SEO..." />
-              </div>
-              <div className="form-group">
-                <label>Cliente (Opcional)</label>
-                <input type="text" value={projClientName} onChange={e => setProjClientName(e.target.value)} placeholder="Nombre del cliente o empresa" list="clients-list" />
-                <datalist id="clients-list">
-                  {clients.map(c => <option key={c.id} value={c.name} />)}
-                </datalist>
-              </div>
-
+              
               <div className="form-row">
                 <div className="form-group flex-1">
-                  <label htmlFor="billing_mode">Régimen de Cobro</label>
-                  <select id="billing_mode" title="Régimen de cobro" value={billingMode} onChange={e => setBillingMode(e.target.value)} className="modal-select">
-                    <option value="by_role">Detallado (Por Perfil)</option>
-                    <option value="flat_rate">Tarifa Plana (Por Hora)</option>
-                  </select>
+                  <label>Categoría</label>
+                  <input type="text" value={projCategory} onChange={e => setProjCategory(e.target.value)} placeholder="Ej. UX/UI" />
                 </div>
-                {billingMode === 'flat_rate' && (
-                  <div className="form-group flex-1">
-                    <label htmlFor="flat_rate">Valor Hora General (UF)</label>
-                    <input id="flat_rate" type="number" step="0.01" value={flatHourlyRate} onChange={e => setFlatHourlyRate(e.target.value)} placeholder="Ej: 1.5" required />
-                  </div>
-                )}
                 <div className="form-group flex-1">
-                  <label htmlFor="hours_per_day">Jornada (Horas/Día)</label>
-                  <input id="hours_per_day" type="number" step="0.5" value={hoursPerDay} onChange={e => setHoursPerDay(e.target.value)} placeholder="8" required />
+                  <label>Cliente</label>
+                  <input type="text" value={projClientName} onChange={e => setProjClientName(e.target.value)} placeholder="Empresa o Persona" list="clients-list" />
+                </div>
+              </div>
+
+              {!editingProject && (
+                <div className="form-group">
+                  <label>Esquema de Cobro</label>
+                  <div className="radio-group">
+                    <label className={`radio-card ${billingMode === 'by_role' ? 'active' : ''}`}>
+                      <input type="radio" value="by_role" checked={billingMode === 'by_role'} onChange={() => setBillingMode('by_role')} />
+                      <span>Detallado (Cargos)</span>
+                    </label>
+                    <label className={`radio-card ${billingMode === 'flat_rate' ? 'active' : ''}`}>
+                      <input type="radio" value="flat_rate" checked={billingMode === 'flat_rate'} onChange={() => setBillingMode('flat_rate')} />
+                      <span>Tarifa Plana</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-row">
+                <div className="form-group flex-1" style={{ display: billingMode === 'flat_rate' ? 'flex' : 'none', flexDirection: 'column' }}>
+                  <label>Valor Hora (UF)</label>
+                  <input type="number" step="0.01" value={flatHourlyRate} onChange={e => setFlatHourlyRate(e.target.value)} placeholder="1.5" required={billingMode === 'flat_rate'} />
+                </div>
+                <div className="form-group flex-1">
+                  <label>Jornada (h/día)</label>
+                  <input type="number" step="0.5" value={hoursPerDay} onChange={e => setHoursPerDay(e.target.value)} placeholder="8" required />
                 </div>
               </div>
               
-              <div className="modal-actions-container">
-                <button type="button" className="outline w-full" onClick={() => setShowModal(false)}>Cancelar</button>
-                <button type="submit" className="primary w-full">Continuar a Detalles</button>
+              <div className="modal-footer">
+                <button type="button" className="text-button" onClick={() => { setShowModal(false); setEditingProject(null); }}>Cancelar</button>
+                <button type="submit" className="primary" style={{ padding: '12px 30px' }}>
+                  {editingProject ? 'Guardar Cambios' : 'Iniciar Estimación'}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
+      <datalist id="clients-list">
+        {clients.map(c => <option key={c.id} value={c.name} />)}
+      </datalist>
+
       <style>{`
-        .dashboard-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 40px;
-        }
-        .projects-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 20px;
-        }
-        .empty-state {
-          grid-column: 1 / -1;
-          text-align: center;
-          padding: 80px 20px;
-          background: rgba(28, 37, 65, 0.4);
-          border: 1px dashed var(--color-border);
-          border-radius: var(--radius-lg);
-          color: var(--color-text-secondary);
-        }
-        .project-card {
-          background: var(--color-bg-secondary);
+        .dashboard-container { padding: 50px 40px; }
+        .dashboard-toolbar { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; }
+
+        /* ── Filter bar ── */
+        .filter-bar { 
+          display: flex; gap: 10px; align-items: center; margin-bottom: 40px;
+          background: rgba(255,255,255,0.03); padding: 8px; border-radius: 60px;
           border: 1px solid var(--color-border);
-          border-radius: var(--radius-md);
-          padding: 24px;
-          cursor: pointer;
-          transition: all 0.2s ease;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+        }
+        .filters-group { display: flex; gap: 8px; align-items: center; padding: 0 8px; }
+
+        /* Custom selects */
+        /* ── Projects grid ── */
+        .projects-grid { 
+          display: grid; 
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+          gap: 24px; 
+          width: 100%;
+        }
+
+        /* ── Project card ── */
+        .project-wrapper { position: relative; }
+        .project-tile {
+          background: linear-gradient(145deg, rgba(22, 32, 60, 0.9), rgba(16, 24, 48, 0.95));
+          border-radius: 20px;
+          padding: 28px 28px 24px;
+          border: 1px solid rgba(255,255,255,0.07);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           height: 100%;
           display: flex;
           flex-direction: column;
+          cursor: pointer;
+          position: relative;
+          overflow: hidden;
+          text-decoration: none;
         }
-        .project-card:hover {
-          transform: translateY(-4px);
-          border-color: var(--color-accent-mint);
-          box-shadow: 0 4px 20px rgba(72, 229, 194, 0.1);
+        /* Accent bar on left */
+        .project-tile::before {
+          content: '';
+          position: absolute;
+          left: 0; top: 0; bottom: 0;
+          width: 3px;
+          background: linear-gradient(180deg, var(--color-accent-mint), transparent);
+          opacity: 0;
+          transition: opacity 0.3s;
         }
-        .card-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 16px;
+        .project-tile:hover::before { opacity: 1; }
+        .project-tile:hover {
+          transform: translateY(-8px);
+          border-color: rgba(72,229,194,0.4);
+          box-shadow: 0 25px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(72,229,194,0.1);
+          background: linear-gradient(145deg, rgba(28, 40, 75, 0.95), rgba(18, 28, 55, 0.98));
         }
-        .card-icon {
-          color: var(--color-accent-mint);
-        }
-        .category-badge {
-          background: rgba(72,229,194,0.15);
-          color: var(--color-accent-mint);
-          padding: 2px 8px;
-          border-radius: 12px;
-          font-size: 0.75rem;
-          font-weight: bold;
-          text-transform: uppercase;
-        }
-        .project-card h3 { margin: 0 0 10px 0; font-weight: 500; font-size: 1.1rem; }
-        .project-card p { margin: 0; color: var(--color-text-secondary); font-size: 0.9rem; }
-        .client-text { margin-bottom: auto !important; font-style: italic; }
-        .card-date { margin-top: auto !important; font-size: 0.8rem !important; opacity: 0.7; padding-top: 15px; }
 
-        .modal-overlay {
-          position: fixed;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(11, 19, 43, 0.8);
-          backdrop-filter: blur(4px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-        }
-        .modal-box {
-          background: var(--color-bg-secondary);
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-lg);
-          padding: 30px;
+        .tile-top { 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center; 
+          margin-bottom: 24px; 
           width: 100%;
-          max-width: 450px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+          position: relative;
         }
-        .form-group {
+
+        .tile-top-left { display: flex; align-items: center; gap: 12px; }
+        
+        .tile-icon { 
+          width: 44px; height: 44px;
+          background: rgba(72, 229, 194, 0.1);
+          color: var(--color-accent-mint);
+          border-radius: 12px;
+          display: flex; align-items: center; justify-content: center;
+          border: 1px solid rgba(72,229,194,0.15);
+        }
+
+        .tile-title-premium {
+          font-size: 1.25rem;
+          font-weight: 800;
+          color: #ffffff;
+          line-height: 1.2;
+          letter-spacing: -0.5px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 200px;
+        }
+
+        .tile-category-pill {
+          display: inline-flex;
+          align-items: center;
+          font-size: 0.65rem;
+          font-weight: 800;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          color: var(--color-accent-mint);
+          background: rgba(72, 229, 194, 0.08);
+          border: 1px solid rgba(72, 229, 194, 0.2);
+          padding: 4px 10px;
+          border-radius: 6px;
           margin-bottom: 20px;
         }
-        .form-group label {
-          display: block;
-          margin-bottom: 8px;
-          color: var(--color-text-secondary);
-          font-size: 0.9rem;
+
+        /* ── Action Menu (3-dots) ── */
+        .tile-actions { 
+          position: relative;
+          z-index: 100;
         }
-        
-        /* New Classes from Refactor */
-        .dashboard-container { padding: 40px 20px; }
-        .error-title { color: var(--color-danger); }
-        .setup-icon { margin-bottom: 20px; }
-        .setup-title { margin: 0 0 10px; }
-        .setup-subtitle { color: var(--color-text-secondary); margin-bottom: 30px; }
-        .setup-form { display: flex; flexDirection: column; gap: 15px; }
-        .header-title-row { display: flex; align-items: center; gap: 15px; }
-        .dashboard-title { margin: 0; }
-        .org-select { padding: 4px 10px; border-radius: var(--radius-sm); background: var(--color-bg-tertiary); color: white; border: 1px solid var(--color-border); }
-        .active-org-name { font-size: 1.2rem; color: var(--color-text-secondary); }
-        .header-subtitle { margin-top: 10px; }
-        .header-actions { display: flex; gap: 15px; }
-        .btn-icon { margin-right: 8px; }
-        .form-row { display: flex; gap: 15px; margin-top: 15px; }
-        .flex-1 { flex: 1; }
-        .modal-select { width: 100%; padding: 10px; border-radius: 4px; background: var(--color-bg-primary); color: white; border: 1px solid var(--color-border); }
-        .modal-actions-container { display: flex; gap: 10px; marginTop: 20px; }
-        .w-full { width: 100%; }
+        .menu-dots-btn {
+          background: transparent;
+          border: none;
+          color: rgba(255,255,255,0.4);
+          padding: 8px;
+          cursor: pointer;
+          border-radius: 50%;
+          transition: all 0.2s;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .menu-dots-btn:hover {
+          background: rgba(255,255,255,0.05);
+          color: var(--color-accent-mint);
+        }
+
+        .action-dropdown {
+          position: absolute;
+          top: 100%;
+          right: 0;
+          background: #1c2541;
+          border: 1px solid var(--color-border);
+          border-radius: 12px;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+          width: 140px;
+          overflow: hidden;
+          animation: fadeIn 0.15s ease-out;
+          z-index: 1000;
+        }
+        .menu-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 16px;
+          color: white;
+          width: 100%;
+          border: none;
+          background: transparent;
+          font-size: 0.85rem;
+          cursor: pointer;
+          transition: background 0.2s;
+          justify-content: flex-start;
+          text-align: left;
+        }
+        .menu-item:hover {
+          background: rgba(255,255,255,0.05);
+        }
+        .menu-item.delete { color: #ef476f; }
+        .menu-item.delete:hover { background: rgba(239, 71, 111, 0.1); }
+
+        /* Client row */
+        .tile-client {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 0.83rem;
+          color: rgba(255,255,255,0.5);
+          margin-bottom: auto;
+          padding-bottom: 16px;
+        }
+
+        /* Footer */
+        .tile-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-top: 1px solid rgba(255,255,255,0.06);
+          padding-top: 14px;
+          margin-top: 14px;
+        }
+        .tile-date { font-size: 0.78rem; color: rgba(255,255,255,0.35); }
+        .tile-arrow { 
+          font-size: 0.85rem; 
+          font-weight: 600;
+          color: var(--color-accent-mint);
+          opacity: 0;
+          transition: opacity 0.2s, transform 0.2s;
+          transform: translateX(-4px);
+        }
+        .project-tile:hover .tile-arrow { opacity: 1; transform: translateX(0); }
+
+        /* ── Modal (Dejado vacío para usar clases globales de index.css) ── */
+        .radio-group { display: flex; gap: 12px; margin-top: 10px; }
+        .radio-card { 
+          flex: 1; border: 1px solid var(--color-border); padding: 15px; border-radius: 12px; cursor: pointer;
+          text-align: center; font-size: 0.9rem; transition: all 0.2s;
+        }
+        .radio-card input { display: none; }
+        .radio-card.active { border-color: var(--color-accent-mint); background: rgba(72, 229, 194, 0.05); color: var(--color-accent-mint); font-weight: 600; }
+
+        /* ── Onboarding cards ── */
+        .onboarding-option-card {
+          background: rgba(28, 37, 65, 0.4);
+          backdrop-filter: blur(8px);
+          padding: 45px 35px;
+          border-radius: 32px;
+          border: 1px solid rgba(255,255,255,0.08);
+          cursor: pointer;
+          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+          text-align: left;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          position: relative;
+        }
+        .onboarding-option-card:hover {
+          transform: translateY(-12px) scale(1.02);
+          border-color: var(--color-accent-mint);
+          box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 0 20px rgba(72, 229, 194, 0.1);
+          background: rgba(30, 40, 70, 0.8);
+        }
+        .option-icon {
+          width: 70px; height: 70px;
+          background: linear-gradient(135deg, rgba(72, 229, 194, 0.15), rgba(72, 229, 194, 0.05));
+          color: var(--color-accent-mint);
+          border-radius: 20px;
+          display: flex;
+          align-items: center; justify-content: center;
+          border: 1px solid rgba(72, 229, 194, 0.2);
+        }
+
+        /* ── Skeleton ── */
+        .skeleton-project { height: 220px; background: rgba(22,32,60,0.6); border-radius: 20px; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 0.3; } 100% { opacity: 0.6; } }
       `}</style>
     </div>
   );
