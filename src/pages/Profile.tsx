@@ -601,7 +601,7 @@ export default function Profile() {
                     {members.map((member: any) => (
                       <div key={member.user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '32px', height: '32px', background: 'rgba(72,229,194,0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyCenter: 'center', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-accent-mint)', display: 'flex', justifyContent: 'center' }}>
+                          <div style={{ width: '32px', height: '32px', background: 'rgba(72,229,194,0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-accent-mint)' }}>
                             {member.user_metadata?.name?.[0] || 'U'}
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
