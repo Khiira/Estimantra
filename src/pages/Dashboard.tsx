@@ -307,7 +307,7 @@ export default function Dashboard() {
       <div className="container flex-column-center-vh">
         <div className="onboarding-card animate-pulse">
           <RefreshCw size={48} className="animate-spin" color="var(--color-accent-mint)" />
-          <h2 style={{ marginTop: '20px' }}>Validando invitación...</h2>
+          <h2 className="onboarding-status-title">Validando invitación...</h2>
         </div>
       </div>
     );
@@ -331,8 +331,8 @@ export default function Dashboard() {
         {onboardingMode === 'selection' && (
           <div className="onboarding-glass-container animate-fade-in">
             <header className="onboarding-header">
-              <h1 className="title-gradient" style={{ fontSize: '3.2rem', marginBottom: '12px', letterSpacing: '-1px' }}>Bienvenido a Estimantra</h1>
-              <p style={{ fontSize: '1.2rem', color: 'var(--color-text-secondary)', opacity: 0.8 }}>Elige cómo quieres empezar a colaborar hoy.</p>
+              <h1 className="title-gradient onboarding-hero-title">Bienvenido a Estimantra</h1>
+              <p className="onboarding-hero-subtitle">Elige cómo quieres empezar a colaborar hoy.</p>
             </header>
             
             <div className="onboarding-grid-glass">
@@ -445,55 +445,54 @@ export default function Dashboard() {
         )}
 
         {onboardingMode === 'create' && (
-          <div className="auth-box animate-fade-in" style={{ maxWidth: '480px', padding: '50px' }}>
-            <button className="back-link" onClick={() => setOnboardingMode('selection')} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="auth-box animate-fade-in setup-card-premium">
+            <button className="setup-back-btn" onClick={() => setOnboardingMode('selection')} title="Volver a selección">
                 <ArrowLeft size={16} /> Volver
             </button>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
-                <div className="option-icon" style={{ width: '80px', height: '80px' }}><Building size={40} /></div>
+            <div className="setup-icon-wrapper">
+                <div className="setup-option-icon"><Building size={40} /></div>
             </div>
-            <h2 className="setup-title" style={{ fontSize: '2rem', textAlign: 'center' }}>Nuevo Equipo</h2>
-            <p className="setup-subtitle" style={{ textAlign: 'center', marginBottom: '40px', color: 'var(--color-text-secondary)' }}>Define el nombre representativo de tu equipo o empresa.</p>
+            <h2 className="setup-title-large">Nuevo Equipo</h2>
+            <p className="setup-subtitle-muted">Define el nombre representativo de tu equipo o empresa.</p>
             <form onSubmit={handleCreateOrganization} className="setup-form">
               <input 
                 type="text" 
                 placeholder="Nombre del equipo" 
+                title="Nombre del equipo"
                 value={newOrgName} 
                 onChange={e => setNewOrgName(e.target.value)} 
                 required 
                 autoFocus 
-                style={{ background: 'rgba(0,0,0,0.2)', padding: '18px 24px', borderRadius: '14px', fontSize: '1.1rem' }}
+                className="setup-input-luxury"
               />
-              <button type="submit" className="primary" style={{ padding: '18px', fontSize: '1.1rem', marginTop: '20px' }}>Crear Equipo</button>
+              <button type="submit" className="primary setup-submit-btn">Crear Equipo</button>
             </form>
           </div>
         )}
 
         {onboardingMode === 'join' && (
-          <div className="auth-box animate-fade-in" style={{ maxWidth: '480px', padding: '50px' }}>
-            <button className="back-link" onClick={() => setOnboardingMode('selection')} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="auth-box animate-fade-in setup-card-premium">
+            <button className="setup-back-btn" onClick={() => setOnboardingMode('selection')} title="Volver a selección">
                 <ArrowLeft size={16} /> Volver
             </button>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
-                <div className="option-icon" style={{ width: '80px', height: '80px', color: 'var(--color-text-secondary)', background: 'rgba(255,255,255,0.05)' }}><FolderPlus size={40} /></div>
+            <div className="setup-icon-wrapper">
+                <div className="setup-option-icon secondary"><FolderPlus size={40} /></div>
             </div>
-            <h2 className="setup-title" style={{ fontSize: '2rem', textAlign: 'center' }}>Unirse a Equipo</h2>
-            <p className="setup-subtitle" style={{ textAlign: 'center', marginBottom: '40px', color: 'var(--color-text-secondary)' }}>Ingresa el código de 8 dígitos proporcionado por tu administrador.</p>
+            <h2 className="setup-title-large">Unirse a Equipo</h2>
+            <p className="setup-subtitle-muted">Ingresa el código de 8 dígitos proporcionado por tu administrador.</p>
             <form onSubmit={handleJoinByCode} className="setup-form">
               <input 
                 type="text" 
                 placeholder="Código de acceso" 
+                title="Código de acceso"
                 value={joinCode} 
                 onChange={e => setJoinCode(e.target.value.toUpperCase())} 
                 required 
                 maxLength={8}
                 autoFocus 
-                style={{ 
-                    background: 'rgba(0,0,0,0.2)', padding: '18px', borderRadius: '14px', fontSize: '1.5rem',
-                    textAlign: 'center', letterSpacing: '8px', fontWeight: 'bold'
-                }}
+                className="setup-input-code"
               />
-              <button type="submit" className="primary" disabled={joining} style={{ padding: '18px', fontSize: '1.1rem', marginTop: '20px' }}>
+              <button type="submit" className="primary setup-submit-btn" disabled={joining}>
                 {joining ? 'Validando...' : 'Entrar al Equipo'}
               </button>
             </form>
@@ -521,6 +520,7 @@ export default function Dashboard() {
             value={filterClient} 
             onChange={e => setFilterClient(e.target.value)}
             className="select-pill"
+            title="Filtrar por cliente"
           >
             <option value="all">Clientes (Todos)</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -532,6 +532,7 @@ export default function Dashboard() {
             value={filterCategory} 
             onChange={e => setFilterCategory(e.target.value)}
             className="select-pill"
+            title="Filtrar por categoría"
           >
             <option value="all">Categorías (Todas)</option>
             {uniqueCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -543,6 +544,7 @@ export default function Dashboard() {
             value={sortBy} 
             onChange={e => setSortBy(e.target.value as 'newest' | 'oldest')}
             className="select-pill"
+            title="Ordenar por fecha"
           >
             <option value="newest">Recientes</option>
             <option value="oldest">Antiguos</option>
@@ -554,11 +556,11 @@ export default function Dashboard() {
         {loadingProjects ? (
           Array(3).fill(0).map((_, i) => <div key={i} className="skeleton-project" />)
         ) : filteredProjects.length === 0 ? (
-          <div className="empty-state animate-fade-in" style={{ gridColumn: '1 / -1' }}>
+          <div className="empty-state animate-fade-in empty-state-full">
             <FolderPlus size={64} opacity={0.3} />
             <h3>Sin proyectos activos</h3>
             <p>Tu equipo aún no tiene estimaciones. ¡Crea la primera!</p>
-            <button className="outline" onClick={() => openEditModal()}>Empezar ahora</button>
+            <button className="outline" onClick={() => openEditModal()} title="Crear mi primer proyecto">Empezar ahora</button>
           </div>
         ) : (
           filteredProjects.map(p => {
@@ -577,6 +579,7 @@ export default function Dashboard() {
                         <div className="tile-actions">
                           <button 
                             className="menu-dots-btn" 
+                            title="Opciones de proyecto"
                             onClick={(e) => { 
                               e.preventDefault(); 
                               e.stopPropagation(); 
@@ -628,18 +631,18 @@ export default function Dashboard() {
             
             <form onSubmit={handleCreateProject} className="modal-form">
               <div className="form-group">
-                <label>Nombre del Proyecto</label>
-                <input type="text" required autoFocus value={projName} onChange={e => setProjName(e.target.value)} placeholder="Ej. Rediseño App Mobile" />
+                <label htmlFor="projName">Nombre del Proyecto</label>
+                <input id="projName" type="text" required autoFocus value={projName} onChange={e => setProjName(e.target.value)} placeholder="Ej. Rediseño App Mobile" title="Nombre del proyecto" />
               </div>
               
               <div className="form-row">
                 <div className="form-group flex-1">
-                  <label>Categoría</label>
-                  <input type="text" value={projCategory} onChange={e => setProjCategory(e.target.value)} placeholder="Ej. UX/UI" />
+                  <label htmlFor="projCategory">Categoría</label>
+                  <input id="projCategory" type="text" value={projCategory} onChange={e => setProjCategory(e.target.value)} placeholder="Ej. UX/UI" title="Categoría del proyecto" />
                 </div>
                 <div className="form-group flex-1">
-                  <label>Cliente</label>
-                  <input type="text" value={projClientName} onChange={e => setProjClientName(e.target.value)} placeholder="Empresa o Persona" list="clients-list" />
+                  <label htmlFor="projClientName">Cliente</label>
+                  <input id="projClientName" type="text" value={projClientName} onChange={e => setProjClientName(e.target.value)} placeholder="Empresa o Persona" list="clients-list" title="Nombre del cliente" />
                 </div>
               </div>
 
@@ -660,19 +663,19 @@ export default function Dashboard() {
               )}
 
               <div className="form-row">
-                <div className="form-group flex-1" style={{ display: billingMode === 'flat_rate' ? 'flex' : 'none', flexDirection: 'column' }}>
-                  <label>Valor Hora (UF)</label>
-                  <input type="number" step="0.01" value={flatHourlyRate} onChange={e => setFlatHourlyRate(e.target.value)} placeholder="1.5" required={billingMode === 'flat_rate'} />
+                <div className="form-group flex-1" style={{ display: billingMode === 'flat_rate' ? 'flex' : 'none' }}>
+                  <label htmlFor="flatHourlyRate">Valor Hora (UF)</label>
+                  <input id="flatHourlyRate" type="number" step="0.01" value={flatHourlyRate} onChange={e => setFlatHourlyRate(e.target.value)} placeholder="1.5" required={billingMode === 'flat_rate'} title="Valor hora en UF" />
                 </div>
                 <div className="form-group flex-1">
-                  <label>Jornada (h/día)</label>
-                  <input type="number" step="0.5" value={hoursPerDay} onChange={e => setHoursPerDay(e.target.value)} placeholder="8" required />
+                  <label htmlFor="hoursPerDay">Jornada (h/día)</label>
+                  <input id="hoursPerDay" type="number" step="0.5" value={hoursPerDay} onChange={e => setHoursPerDay(e.target.value)} placeholder="8" required title="Horas por jornada diaria" />
                 </div>
               </div>
               
               <div className="modal-footer">
                 <button type="button" className="text-button" onClick={() => { setShowModal(false); setEditingProject(null); }}>Cancelar</button>
-                <button type="submit" className="primary" style={{ padding: '12px 30px' }}>
+                <button type="submit" className="primary modal-footer-btn">
                   {editingProject ? 'Guardar Cambios' : 'Iniciar Estimación'}
                 </button>
               </div>

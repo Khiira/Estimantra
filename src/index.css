@@ -516,3 +516,116 @@ button:disabled {
   align-items: center;
 }
 
+/* ── Premium Onboarding & Setup Styles ── */
+.onboarding-status-title {
+  margin-top: 20px;
+  font-weight: 600;
+  color: white;
+}
+
+.onboarding-hero-title {
+  font-size: 3.2rem;
+  margin-bottom: 12px;
+  letter-spacing: -1px;
+}
+
+.onboarding-hero-subtitle {
+  font-size: 1.2rem;
+  color: var(--color-text-secondary);
+  opacity: 0.8;
+}
+
+.setup-card-premium {
+  max-width: 480px;
+  padding: 50px;
+  margin: 0 auto;
+}
+
+.setup-back-btn {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  padding: 0;
+  margin-bottom: 20px;
+}
+
+.setup-back-btn:hover {
+  color: var(--color-accent-mint);
+  background: transparent !important;
+}
+
+.setup-icon-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.setup-option-icon {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(72, 229, 194, 0.1);
+  color: var(--color-accent-mint);
+  border-radius: 20px;
+}
+
+.setup-option-icon.secondary {
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.setup-title-large {
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.setup-subtitle-muted {
+  text-align: center;
+  margin-bottom: 40px;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.setup-input-luxury {
+  background: rgba(0, 0, 0, 0.2) !important;
+  padding: 18px 24px !important;
+  border-radius: 14px !important;
+  font-size: 1.1rem !important;
+}
+
+.setup-input-code {
+  background: rgba(0, 0, 0, 0.2) !important;
+  padding: 18px !important;
+  border-radius: 14px !important;
+  font-size: 1.5rem !important;
+  text-align: center !important;
+  letter-spacing: 8px !important;
+  font-weight: bold !important;
+}
+
+.setup-submit-btn {
+  padding: 18px !important;
+  font-size: 1.1rem !important;
+  margin-top: 20px !important;
+  width: 100%;
+}
+
+.empty-state-full {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  gap: 16px;
+}
+
