@@ -18,18 +18,24 @@ La plataforma utiliza un stack moderno enfocado en el rendimiento y la seguridad
 El desarrollo de Estimantra sigue principios de ingeniería sólida:
 
 ### 1. Atomic CSS Architecture
+
 Hemos centralizado todos los estilos en `index.css` eliminando el uso de estilos inline y bloques `<style>` internos. Utilizamos:
+
 - **Design Tokens**: Variables CSS para colores (Mint Green, Deep Blue), espaciados y sombras.
 - **Utility Classes**: Clases reutilizables para layouts flexbox, grid y tipografía.
 - **Premium Glassmorphism**: Efectos de desenfoque de fondo y transparencias controladas en toda la UI.
 
 ### 2. Client-Side BaaS Pattern
+
 La lógica de negocio interactúa directamente con los servicios de InsForge desde el cliente, optimizando el tiempo de respuesta:
+
 - **Auth**: Gestión de sesiones y flujos de OTP (One-Time Password) integrados.
 - **Realtime Sync**: Sincronización automática de proyectos y tareas mediante suscripciones WebSockets.
 
 ### 3. Role-Based Access Control (RBAC)
+
 La seguridad no solo reside en el cliente, sino que se valida en el núcleo:
+
 - **Row Level Security (RLS)**: Las políticas de base de datos garantizan que los usuarios solo accedan a los datos de sus organizaciones autorizadas.
 
 ## 📊 Estructura de Datos (PostgreSQL)
@@ -56,6 +62,7 @@ npm run build
 ```
 
 ## 🌐 Despliegue
+
 La plataforma se despliega automáticamente mediante **InsForge CLI**, garantizando que el bundle final esté optimizado y las variables de entorno sean seguras.
 
 ---
