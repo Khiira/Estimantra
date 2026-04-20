@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRoute } from 'wouter';
 import { insforge } from '../lib/insforge';
-import { ArrowLeft, Plus, Check } from 'lucide-react';
+import { ArrowLeft, Plus, Check, ChevronDown } from 'lucide-react';
 import { Link } from 'wouter';
 import TaskTree from '../components/TaskTree';
 import ProposalBuilder from '../components/ProposalBuilder';
@@ -293,19 +293,22 @@ export default function ProjectEstimator() {
             </div>
 
             <div className="version-selector-container">
-               <select 
-                 className="version-select"
-                 value={selectedVersion}
-                 onChange={(e) => setSelectedVersion(e.target.value)}
-                 disabled={isVersioning || loadingTasks || !!editorUser}
-                 title="Seleccionar versión"
-               >
-                 {allVersions.map(v => (
-                   <option key={v.label} value={v.label}>
-                     v{v.label} - {v.name || 'Sin nombre'}
-                   </option>
-                 ))}
-               </select>
+               <div className="select-wrapper">
+                 <select 
+                   className="version-select"
+                   value={selectedVersion}
+                   onChange={(e) => setSelectedVersion(e.target.value)}
+                   disabled={isVersioning || loadingTasks || !!editorUser}
+                   title="Seleccionar versión"
+                 >
+                   {allVersions.map(v => (
+                     <option key={v.label} value={v.label}>
+                       v{v.label} - {v.name || 'Sin nombre'}
+                     </option>
+                   ))}
+                 </select>
+                 <ChevronDown size={14} className="select-icon" />
+               </div>
                <button 
                  className="accent-btn version-btn-small" 
                  onClick={handleCreateNewVersion}

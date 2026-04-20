@@ -846,6 +846,12 @@ button:disabled {
   margin-left: 10px;
 }
 
+.select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .version-select {
   background: transparent;
   border: none;
@@ -854,6 +860,16 @@ button:disabled {
   font-size: 0.9rem;
   outline: none;
   cursor: pointer;
+  padding-right: 20px;
+  appearance: none;
+}
+
+.select-icon {
+  position: absolute;
+  right: 0;
+  pointer-events: none;
+  color: var(--color-accent-mint);
+  opacity: 0.8;
 }
 
 .header-totals {
@@ -1324,10 +1340,6 @@ button:disabled {
   font-weight: 700;
   color: var(--color-accent-mint);
   margin-top: 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1.1rem;
 }
 
 /* ── Project Tiles ── */
