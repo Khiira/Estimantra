@@ -69,20 +69,19 @@ export default function Navigation() {
         <Link href="/" className="nav-logo">Estimantra</Link>
         
         {myOrganizations && myOrganizations.length > 0 && !location.startsWith('/project') && (
-          <div className="org-switcher" style={{ marginLeft: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="nav-org-switcher">
             <Building size={16} color="var(--color-text-secondary)" />
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="flex flex-column">
               <select 
                 title="Cambiar Equipo"
-                className="org-select select-pill"
+                className="nav-org-pill select-pill"
                 value={activeOrganization?.id || ''} 
                 onChange={(e) => setActiveOrganization(myOrganizations.find(o => o.id === e.target.value))}
-                style={{ height: '32px', minWidth: '140px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
               >
                 {myOrganizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}
               </select>
               {activeOrganization?.role && (
-                <span style={{ fontSize: '0.65rem', color: 'var(--color-accent-mint)', opacity: 0.8, marginTop: '2px', marginLeft: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+                <span className="nav-role-label">
                   {activeOrganization.role === 'admin' ? 'Administrador' : 'Miembro'}
                 </span>
               )}
@@ -102,12 +101,13 @@ export default function Navigation() {
           </button>
 
           {showDropdown && (
-            <div className="dropdown-menu" style={{ width: '250px', padding: '12px 0' }}>
-              <div className="dropdown-header" style={{ padding: '0 16px 12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <p style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '4px' }}>Sesión iniciada como</p>
-                <strong style={{ fontSize: '1rem', color: 'white' }}>{userDisplayName}</strong>
+            <div className="dropdown-menu dropdown-menu-premium">
+              <div className="dropdown-header-premium">
+                <p>Sesión iniciada como</p>
+                <strong>{userDisplayName}</strong>
               </div>
-              <div style={{ height: '8px' }}></div>
+              
+              <div className="margin-top-10"></div>
               
               <Link href="/profile" onClick={() => setShowDropdown(false)}>
                 <button className="dropdown-item">
@@ -117,23 +117,23 @@ export default function Navigation() {
               
               <Link href="/organization" onClick={() => setShowDropdown(false)}>
                 <button className="dropdown-item">
-                  <Settings size={16} /> <span style={{ whiteSpace: 'nowrap' }}>Configuración del Equipo</span>
+                  <Settings size={16} /> <span className="nowrap">Ajustes del Equipo</span>
                 </button>
               </Link>
-
+              
               <Link href="/profile#teams" onClick={() => setShowDropdown(false)}>
-                <button className="dropdown-item" style={{ color: 'var(--color-accent-mint)' }}>
+                <button className="dropdown-item text-accent-mint">
                   <Plus size={16} /> <span>Unirse a otro equipo</span>
                 </button>
               </Link>
-
-              <button className="dropdown-item" onClick={() => { setLocation('/profile#billing'); setShowDropdown(false); }}>
-                <CreditCard size={16} /> <span>Planes y Facturación</span>
-              </button>
-
-              <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '8px 12px' }}></div>
               
-              <button className="dropdown-item danger" onClick={handleLogout} style={{ marginBottom: '4px' }}>
+              <button className="dropdown-item" onClick={() => { setLocation('/profile#billing'); setShowDropdown(false); }}>
+                <CreditCard size={16} /> <span>Facturación</span>
+              </button>
+              
+              <div className="dropdown-divider"></div>
+              
+              <button className="dropdown-item danger margin-bottom-5" onClick={handleLogout}>
                 <LogOut size={16} /> <span>Cerrar Sesión</span>
               </button>
             </div>

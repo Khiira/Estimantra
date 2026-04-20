@@ -355,92 +355,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <style>{`
-              .onboarding-glass-container {
-                width: 100%;
-                max-width: 1000px;
-                padding: 60px;
-                background: rgba(28, 37, 65, 0.4);
-                backdrop-filter: blur(25px);
-                border: 1px solid rgba(72, 229, 194, 0.15);
-                border-radius: 48px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                box-shadow: 0 40px 100px rgba(0,0,0,0.4);
-              }
-              .onboarding-grid-glass {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-                gap: 32px;
-                width: 100%;
-                margin-top: 40px;
-              }
-              .glass-card {
-                background: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                padding: 40px;
-                border-radius: 32px;
-                cursor: pointer;
-                transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-                display: flex;
-                flex-direction: column;
-                gap: 20px;
-                position: relative;
-                overflow: hidden;
-              }
-              .glass-card:hover {
-                background: rgba(255, 255, 255, 0.06);
-                transform: translateY(-10px);
-                border-color: rgba(72, 229, 194, 0.4);
-                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-              }
-              .glass-card.primary:hover {
-                box-shadow: 0 20px 40px rgba(72, 229, 194, 0.1);
-              }
-              .glass-icon-container {
-                width: 64px;
-                height: 64px;
-                background: rgba(72, 229, 194, 0.15);
-                border: 1px solid rgba(72, 229, 194, 0.2);
-                border-radius: 20px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: var(--color-accent-mint);
-                box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-              }
-              .glass-icon-container.secondary {
-                background: rgba(255, 255, 255, 0.05);
-                border-color: rgba(255, 255, 255, 0.1);
-                color: var(--color-text-secondary);
-              }
-              .glass-card h3 {
-                font-size: 1.6rem;
-                font-weight: 700;
-                margin: 0;
-              }
-              .glass-card p {
-                font-size: 1rem;
-                color: var(--color-text-secondary);
-                line-height: 1.6;
-                margin: 0;
-              }
-              .glass-action-btn {
-                font-weight: 700;
-                color: var(--color-accent-mint);
-                margin-top: 10px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                font-size: 1.1rem;
-              }
-              .glass-action-btn.secondary {
-                color: var(--color-accent-mint);
-                opacity: 0.9;
-                filter: brightness(0.9);
-              }
-            `}</style>
           </div>
         )}
 
@@ -570,7 +484,7 @@ export default function Dashboard() {
                     <div className="project-tile" onClick={() => setActiveMenuId(null)}>
                       <div className="tile-top">
                         <div className="tile-top-left">
-                          <div className="tile-icon">
+                          <div className="tile-icon-box">
                             <FileText size={22} />
                           </div>
                           <div className="tile-title-premium">{p.name}</div>
@@ -604,13 +518,13 @@ export default function Dashboard() {
                       
                       <div className="tile-category-pill">{p.category || 'GENERAL'}</div>
                       
-                      <div className="tile-client">
+                      <div className="tile-client flex align-center gap-1 font-size-sm text-secondary">
                         <Building size={14} /> {p.clients?.name || 'Cliente Particular'}
                       </div>
 
-                      <div className="tile-footer">
-                        <div className="tile-date">Actividad: {new Date(p.updated_at).toLocaleDateString()}</div>
-                        <div className="tile-arrow">Ver →</div>
+                      <div className="tile-footer flex justify-between align-center margin-top-auto padding-top-15">
+                        <div className="tile-date font-size-sm opacity-60">Actividad: {new Date(p.updated_at).toLocaleDateString()}</div>
+                        <div className="tile-arrow font-bold color-accent-mint">Ver →</div>
                       </div>
                     </div>
                   </Link>
@@ -663,7 +577,7 @@ export default function Dashboard() {
               )}
 
               <div className="form-row">
-                <div className="form-group flex-1" style={{ display: billingMode === 'flat_rate' ? 'flex' : 'none' }}>
+                <div className={`form-group flex-1 ${billingMode === 'flat_rate' ? '' : 'hidden'}`}>
                   <label htmlFor="flatHourlyRate">Valor Hora (UF)</label>
                   <input id="flatHourlyRate" type="number" step="0.01" value={flatHourlyRate} onChange={e => setFlatHourlyRate(e.target.value)} placeholder="1.5" required={billingMode === 'flat_rate'} title="Valor hora en UF" />
                 </div>
@@ -687,239 +601,6 @@ export default function Dashboard() {
       <datalist id="clients-list">
         {clients.map(c => <option key={c.id} value={c.name} />)}
       </datalist>
-
-      <style>{`
-        .dashboard-container { padding: 50px 40px; }
-        .dashboard-toolbar { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; }
-
-        /* ── Filter bar ── */
-        .filter-bar { 
-          display: flex; gap: 10px; align-items: center; margin-bottom: 40px;
-          background: rgba(255,255,255,0.03); padding: 8px; border-radius: 60px;
-          border: 1px solid var(--color-border);
-          box-shadow: 0 8px 30px rgba(0,0,0,0.25);
-        }
-        .filters-group { display: flex; gap: 8px; align-items: center; padding: 0 8px; }
-
-        /* Custom selects */
-        /* ── Projects grid ── */
-        .projects-grid { 
-          display: grid; 
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
-          gap: 24px; 
-          width: 100%;
-        }
-
-        /* ── Project card ── */
-        .project-wrapper { position: relative; }
-        .project-tile {
-          background: linear-gradient(145deg, rgba(22, 32, 60, 0.9), rgba(16, 24, 48, 0.95));
-          border-radius: 20px;
-          padding: 28px 28px 24px;
-          border: 1px solid rgba(255,255,255,0.07);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          cursor: pointer;
-          position: relative;
-          overflow: hidden;
-          text-decoration: none;
-        }
-        /* Accent bar on left */
-        .project-tile::before {
-          content: '';
-          position: absolute;
-          left: 0; top: 0; bottom: 0;
-          width: 3px;
-          background: linear-gradient(180deg, var(--color-accent-mint), transparent);
-          opacity: 0;
-          transition: opacity 0.3s;
-        }
-        .project-tile:hover::before { opacity: 1; }
-        .project-tile:hover {
-          transform: translateY(-8px);
-          border-color: rgba(72,229,194,0.4);
-          box-shadow: 0 25px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(72,229,194,0.1);
-          background: linear-gradient(145deg, rgba(28, 40, 75, 0.95), rgba(18, 28, 55, 0.98));
-        }
-
-        .tile-top { 
-          display: flex; 
-          justify-content: space-between; 
-          align-items: center; 
-          margin-bottom: 24px; 
-          width: 100%;
-          position: relative;
-        }
-
-        .tile-top-left { display: flex; align-items: center; gap: 12px; }
-        
-        .tile-icon { 
-          width: 44px; height: 44px;
-          background: rgba(72, 229, 194, 0.1);
-          color: var(--color-accent-mint);
-          border-radius: 12px;
-          display: flex; align-items: center; justify-content: center;
-          border: 1px solid rgba(72,229,194,0.15);
-        }
-
-        .tile-title-premium {
-          font-size: 1.25rem;
-          font-weight: 800;
-          color: #ffffff;
-          line-height: 1.2;
-          letter-spacing: -0.5px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          max-width: 200px;
-        }
-
-        .tile-category-pill {
-          display: inline-flex;
-          align-items: center;
-          font-size: 0.65rem;
-          font-weight: 800;
-          letter-spacing: 0.05em;
-          text-transform: uppercase;
-          color: var(--color-accent-mint);
-          background: rgba(72, 229, 194, 0.08);
-          border: 1px solid rgba(72, 229, 194, 0.2);
-          padding: 4px 10px;
-          border-radius: 6px;
-          margin-bottom: 20px;
-        }
-
-        /* ── Action Menu (3-dots) ── */
-        .tile-actions { 
-          position: relative;
-          z-index: 100;
-        }
-        .menu-dots-btn {
-          background: transparent;
-          border: none;
-          color: rgba(255,255,255,0.4);
-          padding: 8px;
-          cursor: pointer;
-          border-radius: 50%;
-          transition: all 0.2s;
-          display: flex; align-items: center; justify-content: center;
-        }
-        .menu-dots-btn:hover {
-          background: rgba(255,255,255,0.05);
-          color: var(--color-accent-mint);
-        }
-
-        .action-dropdown {
-          position: absolute;
-          top: 100%;
-          right: 0;
-          background: #1c2541;
-          border: 1px solid var(--color-border);
-          border-radius: 12px;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-          width: 140px;
-          overflow: hidden;
-          animation: fadeIn 0.15s ease-out;
-          z-index: 1000;
-        }
-        .menu-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 12px 16px;
-          color: white;
-          width: 100%;
-          border: none;
-          background: transparent;
-          font-size: 0.85rem;
-          cursor: pointer;
-          transition: background 0.2s;
-          justify-content: flex-start;
-          text-align: left;
-        }
-        .menu-item:hover {
-          background: rgba(255,255,255,0.05);
-        }
-        .menu-item.delete { color: #ef476f; }
-        .menu-item.delete:hover { background: rgba(239, 71, 111, 0.1); }
-
-        /* Client row */
-        .tile-client {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 0.83rem;
-          color: rgba(255,255,255,0.5);
-          margin-bottom: auto;
-          padding-bottom: 16px;
-        }
-
-        /* Footer */
-        .tile-footer {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-top: 1px solid rgba(255,255,255,0.06);
-          padding-top: 14px;
-          margin-top: 14px;
-        }
-        .tile-date { font-size: 0.78rem; color: rgba(255,255,255,0.35); }
-        .tile-arrow { 
-          font-size: 0.85rem; 
-          font-weight: 600;
-          color: var(--color-accent-mint);
-          opacity: 0;
-          transition: opacity 0.2s, transform 0.2s;
-          transform: translateX(-4px);
-        }
-        .project-tile:hover .tile-arrow { opacity: 1; transform: translateX(0); }
-
-        /* ── Modal (Dejado vacío para usar clases globales de index.css) ── */
-        .radio-group { display: flex; gap: 12px; margin-top: 10px; }
-        .radio-card { 
-          flex: 1; border: 1px solid var(--color-border); padding: 15px; border-radius: 12px; cursor: pointer;
-          text-align: center; font-size: 0.9rem; transition: all 0.2s;
-        }
-        .radio-card input { display: none; }
-        .radio-card.active { border-color: var(--color-accent-mint); background: rgba(72, 229, 194, 0.05); color: var(--color-accent-mint); font-weight: 600; }
-
-        /* ── Onboarding cards ── */
-        .onboarding-option-card {
-          background: rgba(28, 37, 65, 0.4);
-          backdrop-filter: blur(8px);
-          padding: 45px 35px;
-          border-radius: 32px;
-          border: 1px solid rgba(255,255,255,0.08);
-          cursor: pointer;
-          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-          text-align: left;
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-          position: relative;
-        }
-        .onboarding-option-card:hover {
-          transform: translateY(-12px) scale(1.02);
-          border-color: var(--color-accent-mint);
-          box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 0 20px rgba(72, 229, 194, 0.1);
-          background: rgba(30, 40, 70, 0.8);
-        }
-        .option-icon {
-          width: 70px; height: 70px;
-          background: linear-gradient(135deg, rgba(72, 229, 194, 0.15), rgba(72, 229, 194, 0.05));
-          color: var(--color-accent-mint);
-          border-radius: 20px;
-          display: flex;
-          align-items: center; justify-content: center;
-          border: 1px solid rgba(72, 229, 194, 0.2);
-        }
-
-        /* ── Skeleton ── */
-        .skeleton-project { height: 220px; background: rgba(22,32,60,0.6); border-radius: 20px; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 0.3; } 100% { opacity: 0.6; } }
-      `}</style>
     </div>
   );
 }

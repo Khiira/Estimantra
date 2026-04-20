@@ -285,7 +285,7 @@ export default function OrganizationSettings() {
               Copiar Código
             </button>
           </div>
-          <p className="settings-id-badge" style={{ marginTop: '10px' }}>
+          <p className="settings-id-badge margin-top-10">
             Los nuevos miembros pueden unirse ingresando este código al iniciar sesión.
           </p>
         </div>
@@ -324,10 +324,9 @@ export default function OrganizationSettings() {
                           <Crown size={14} color={m.role === 'admin' ? 'gold' : 'var(--color-text-muted)'} />
                         </button>
                         <button 
-                          className="outline text-button danger-hover" 
+                          className="outline text-button danger-hover text-danger" 
                           onClick={() => handleRemoveMember(m.user_id)}
                           title="Eliminar Miembro"
-                          style={{ color: 'var(--color-danger)' }}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -408,8 +407,7 @@ export default function OrganizationSettings() {
               title="Confirmar eliminación escribiendo el nombre de la organización"
               value={confirmDeleteName} 
               onChange={e => setConfirmDeleteName(e.target.value)} 
-              className="danger-confirm-input"
-              style={{ borderColor: confirmDeleteName === activeOrganization.name ? 'var(--color-danger)' : '' }}
+              className={`danger-confirm-input ${confirmDeleteName === activeOrganization.name ? 'border-danger' : ''}`}
             />
           </div>
 
@@ -424,41 +422,6 @@ export default function OrganizationSettings() {
         </section>
       )}
 
-      <style>{`
-        .settings-panel {
-          background: var(--color-bg-secondary);
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-lg);
-          padding: 30px;
-        }
-        .member-card {
-          display: flex;
-          align-items: center;
-          gap: 15px;
-          padding: 15px;
-          border-bottom: 1px solid var(--color-bg-tertiary);
-        }
-        .member-card:last-child {
-          border-bottom: none;
-        }
-        .avatar {
-          width: 45px; height: 45px;
-          border-radius: 50%;
-          background: rgba(72,229,194,0.1);
-          color: var(--color-accent-mint);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          font-size: 1.2rem;
-          font-weight: bold;
-          overflow: hidden;
-        }
-        .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .member-info h4 { margin: 0 0 5px 0; display: flex; align-items: center; gap: 8px;}
-        .member-info p { margin: 0; font-size: 0.85rem; color: var(--color-text-secondary); display: flex; align-items: center; gap: 5px;}
-        .badge { background: rgba(72,229,194,0.15); color: var(--color-accent-mint); padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; }
-        .member-actions { margin-left: auto; }
-      `}</style>
     </div>
   );
 }

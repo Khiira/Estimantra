@@ -158,7 +158,10 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
 
     return (
       <div key={node.id} className="task-node-wrapper">
-        <div className={`task-node depth-${depth}`} style={{ paddingLeft: `${depth * 25}px`, opacity: readOnly && !hasChildren ? 0.6 : 1 }}>
+        <div 
+          className={`task-node depth-${depth} ${readOnly && !hasChildren ? 'opacity-60' : ''}`} 
+          style={{ '--depth': depth } as React.CSSProperties}
+        >
           
           <div className="task-left" onClick={() => toggleExpand(node.id)}>
             {hasChildren ? (
@@ -166,7 +169,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
                 {isExpanded ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
               </button>
             ) : (
-              <div style={{width: 24}}></div> // spacer
+              <div className="spacer-node"></div> 
             )}
             <span className="task-name">{node.task_name}</span>
           </div>
@@ -190,6 +193,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
                   disabled={readOnly}
                   value={node.assigned_role_id || ''} 
                   onChange={e => handleUpdateTask(node.id, 'assigned_role_id', e.target.value)}
+                  title="Seleccionar perfil asignado"
                 >
                   <option value="">Ningún Perfil</option>
                   {roles.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
@@ -204,11 +208,11 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
               </div>
             ) : (
               // Modo "Rama": Muestra total heredado MÁS el botón de descripción
-              <div className="task-hours" style={{ gap: '15px' }}>
-                <span title="Costo Parcial (Calculado)">
+              <div className="task-hours gap-3">
+                <span title="Costo Parcial (Calculado)" className="flex align-center gap-1">
                   <DollarSign size={12}/> {node.totalCost.toLocaleString('en-US')}
                 </span>
-                <span title="Horas (Calculadas)">
+                <span title="Horas (Calculadas)" className="flex align-center gap-1">
                   <Clock size={12}/> {node.totalHours}h
                 </span>
                 <button 
@@ -236,7 +240,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
 
         {/* Panel Desplegable de Descripción Opcional (Ahora para todos) */}
         {editingDetailsId === node.id && (
-          <div className="task-details-panel" style={{ marginLeft: `${depth * 25 + 32}px` }}>
+          <div className="task-details-panel" style={{ '--depth': depth } as React.CSSProperties}>
             <textarea 
               placeholder="Descripción opcional de cómo se ejecutará esta tarea..."
               readOnly={readOnly}
@@ -248,7 +252,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
         )}
 
         {addingTaskTo === node.id && !readOnly && (
-          <div className="add-task-inline" style={{ paddingLeft: `${(depth + 1) * 25 + 24}px` }}>
+          <div className="add-task-inline" style={{ '--depth': depth + 1 } as React.CSSProperties}>
             <input 
               autoFocus
               type="text" 
@@ -260,6 +264,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
                 if (e.key === 'Escape') setAddingTaskTo(null);
               }}
               onBlur={() => handleCreateTask(node.id)}
+              className="text-input"
             />
           </div>
         )}
@@ -300,112 +305,6 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
         )}
       </div>
 
-      <style>{`
-        .task-tree-container {
-          margin-top: 10px;
-        }
-        .task-node {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 10px;
-          border-bottom: 1px solid rgba(91, 192, 190, 0.1);
-          transition: background 0.2s;
-        }
-        .task-node:hover {
-          background: rgba(28, 37, 65, 0.6);
-        }
-        .task-left {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          cursor: pointer;
-          flex-grow: 1;
-        }
-        .task-name {
-          font-weight: 500;
-        }
-        .task-right {
-          display: flex;
-          align-items: center;
-          gap: 20px;
-        }
-        .task-hours {
-          display: flex;
-          align-items: center;
-          gap: 5px;
-          color: var(--color-accent-mint);
-          font-family: monospace;
-          background: rgba(72, 229, 194, 0.1);
-          padding: 2px 8px;
-          border-radius: var(--radius-sm);
-        }
-        .task-actions {
-          display: flex;
-          gap: 5px;
-          opacity: 0;
-          transition: opacity 0.2s;
-        }
-        .task-node:hover .task-actions {
-          opacity: 1;
-        }
-        .add-task-inline {
-          padding: 8px 10px;
-        }
-        .add-task-inline input {
-          padding: 6px 12px;
-          font-size: 0.9rem;
-          background: var(--color-bg-primary);
-        }
-        .new-root-btn {
-          margin-top: 20px;
-          color: var(--color-text-secondary);
-        }
-        .new-root-btn:hover {
-          color: var(--color-accent-mint);
-        }
-        .task-leaf-controls {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .hours-input {
-          width: 60px;
-          padding: 2px 5px;
-          text-align: right;
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.1);
-          color: var(--color-accent-mint);
-          font-family: monospace;
-          border-radius: var(--radius-sm);
-        }
-        .role-select {
-          padding: 2px 5px;
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.1);
-          color: var(--color-text-primary);
-          font-size: 0.85rem;
-          border-radius: var(--radius-sm);
-          outline: none;
-        }
-        .task-details-panel {
-          padding: 10px 10px 10px 0;
-        }
-        .task-details-panel textarea {
-          width: 100%;
-          background: rgba(0,0,0,0.15);
-          border: 1px dashed rgba(72, 229, 194, 0.3);
-          border-radius: var(--radius-sm);
-          padding: 8px;
-          font-size: 0.85rem;
-          color: var(--color-text-secondary);
-          resize: vertical;
-        }
-        .active-accent {
-          color: var(--color-accent-mint);
-          background: rgba(72, 229, 194, 0.1);
-        }
-      `}</style>
     </div>
   );
 }

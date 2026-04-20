@@ -323,20 +323,20 @@ export default function ProjectEstimator() {
   if (loading) {
     return (
       <div className="estimator-workspace">
-        <div className="breadcrumb-bar" style={{ borderBottom: '1px solid var(--color-border)' }}>
+        <div className="breadcrumb-bar">
           <div className="title-area">
-             <div className="skeleton" style={{ width: '40px', height: '40px', borderRadius: '50%' }}></div>
-             <div className="skeleton" style={{ width: '250px', height: '30px', borderRadius: '8px' }}></div>
+             <div className="skeleton skeleton-circle"></div>
+             <div className="skeleton skeleton-text-lg"></div>
           </div>
-          <div className="skeleton header-totals" style={{ width: '400px', height: '70px', border: 'none' }}></div>
+          <div className="skeleton header-totals skeleton-header-totals"></div>
         </div>
         
         <div className="workspace-tabs">
-           <div className="skeleton" style={{ width: '200px', height: '40px', margin: '10px 0' }}></div>
-           <div className="skeleton" style={{ width: '200px', height: '40px', margin: '10px 0' }}></div>
+           <div className="skeleton skeleton-text-md margin-top-10"></div>
+           <div className="skeleton skeleton-text-md margin-top-10"></div>
         </div>
 
-        <div className="workspace-grid loading-grid" style={{ paddingTop: '30px' }}>
+        <div className="workspace-grid loading-grid padding-top-30">
            <aside className="skeleton roles-skeleton"></aside>
            <main className="skeleton tasks-skeleton"></main>
         </div>
@@ -363,9 +363,9 @@ export default function ProjectEstimator() {
               <ArrowLeft size={18} />
             </button>
           </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div className="estimator-header-title">
             <div>
-              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>{project.name}</h2>
+              <h2 className="estimator-name">{project.name}</h2>
               <div className="project-meta">
                 {project.category && <span className="category-tag">{project.category}</span>}
                 {project.clients?.name && <span className="client-tag">{project.clients.name}</span>}
@@ -383,11 +383,10 @@ export default function ProjectEstimator() {
                  {allVersions.map(v => <option key={v} value={v}>v{v}</option>)}
                </select>
                <button 
-                 className="accent-btn" 
+                 className="accent-btn version-btn-small" 
                  onClick={handleCreateNewVersion}
                  disabled={isVersioning || !!editorUser}
                  title="Crear nueva versión"
-                 style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px' }}
                >
                  {isVersioning ? '...' : '+ Versión'}
                </button>
@@ -421,7 +420,7 @@ export default function ProjectEstimator() {
       </div>
 
       {activeTab === 'estimator' ? (
-      <div className="workspace-grid" style={{ opacity: editorUser ? 0.7 : 1 }}>
+      <div className={`workspace-grid ${editorUser ? 'locked-overlay' : ''}`}>
         <aside className="roles-panel animate-fade-in">
           <div className="panel-header">
             <h3>Perfiles Técnicos</h3>
@@ -463,7 +462,7 @@ export default function ProjectEstimator() {
                 {project?.billing_mode === 'flat_rate' ? (
                    <input title="Costo general" placeholder="Costo" type="text" disabled value={`Tarifa Plana: ${project?.flat_hourly_rate} UF`} />
                 ) : (
-                   <div style={{flex: 1}}>
+                   <div className="flex-1">
                      <label htmlFor="role_cost" className="sr-only">Costo / hora (UF)</label>
                      <input id="role_cost" title="Costo por hora" type="number" step="0.01" placeholder="Costo / hora (UF)" value={newRoleCost} onChange={e => setNewRoleCost(e.target.value)} required />
                    </div>
@@ -519,200 +518,8 @@ export default function ProjectEstimator() {
       ) : (
         <div className="proposal-view-container">
              <ProposalBuilder project={project} tasks={tasks} grandTotals={grandTotals} />
-
         </div>
       )}
-
-      <style>{`
-        .estimator-workspace {
-          min-height: calc(100vh - 70px);
-          display: flex;
-          flex-direction: column;
-        }
-        .lock-banner {
-          background: rgba(255, 171, 0, 0.1);
-          color: #ffab00;
-          padding: 8px 40px;
-          text-align: center;
-          font-size: 0.9rem;
-          border-bottom: 1px solid rgba(255, 171, 0, 0.2);
-        }
-        .breadcrumb-bar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 15px 40px;
-          background: rgba(255,255,255,0.02);
-          border-bottom: 1px solid var(--color-border);
-        }
-        .title-area {
-          display: flex;
-          align-items: center;
-          gap: 20px;
-        }
-        .title-area h2 { margin: 0; color: var(--color-accent-mint); }
-        .title-area p { margin: 0; font-size: 0.9rem; color: var(--color-text-secondary); }
-        .icon-btn.tooltip { background: transparent; border: none; padding: 8px; border-radius: 50%; display: flex;}
-        .icon-btn.tooltip:hover { background: var(--color-bg-tertiary); color: var(--color-accent-mint); }
-        
-        .version-selector-container {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background: rgba(255,255,255,0.05);
-          padding: 4px 10px;
-          border-radius: var(--radius-md);
-          border: 1px solid var(--color-border);
-          margin-left: 10px;
-        }
-        .version-select {
-          background: transparent;
-          border: none;
-          color: var(--color-accent-mint);
-          font-weight: 600;
-          font-size: 0.9rem;
-          outline: none;
-          cursor: pointer;
-        }
-        .accent-btn {
-          background: rgba(72, 229, 194, 0.1);
-          color: var(--color-accent-mint);
-          border: 1px solid var(--color-accent-mint);
-          transition: all 0.2s;
-        }
-        .accent-btn:hover:not(:disabled) {
-          background: var(--color-accent-mint);
-          color: var(--color-bg-primary);
-        }
-        .accent-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .tab-btn {
-            background: transparent;
-            border: none;
-            color: var(--color-text-secondary);
-            padding: 15px 20px;
-            font-size: 1.05rem;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            border-radius: 0;
-            transition: all 0.2s ease;
-        }
-        .tab-btn:hover { color: var(--color-text-primary); }
-        .tab-btn.active {
-            color: var(--color-accent-mint);
-            border-bottom-color: var(--color-accent-mint);
-        }
-
-        .workspace-grid {
-          display: grid;
-          grid-template-columns: 300px 1fr;
-          gap: 20px;
-          padding: 30px 40px;
-          flex-grow: 1;
-        }
-        
-        .roles-panel, .tasks-panel {
-          background: rgba(28, 37, 65, 0.4);
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-lg);
-          padding: 24px;
-        }
-        
-        .panel-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 15px;
-        }
-        .panel-header h3 {
-          margin: 0;
-          font-weight: 500;
-        }
-        
-        .empty-msg {
-          font-size: 0.9rem;
-          color: var(--color-text-muted);
-          font-style: italic;
-        }
-        
-        .role-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px;
-          background: var(--color-bg-tertiary);
-          border-radius: var(--radius-md);
-          margin-bottom: 8px;
-        }
-        .color-dot {
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-        }
-        .cost {
-          margin-left: auto;
-          color: var(--color-accent-mint);
-          font-family: monospace;
-        }
-
-        .title-skeleton { width: 200px; height: 35px; }
-        .totals-skeleton { width: 150px; height: 55px; }
-        .loading-grid { gap: 20px; }
-        .roles-skeleton { height: 60vh; border-radius: var(--radius-lg); }
-        .tasks-skeleton { height: 80vh; border-radius: var(--radius-lg); }
-        .project-meta { display: flex; gap: 10px; margin-top: 5px; margin-bottom: 5px; }
-        .category-tag { font-size: 0.8rem; background: rgba(72,229,194,0.15); color: var(--color-accent-mint); padding: 2px 8px; border-radius: 12px; }
-        .client-tag { font-size: 0.8rem; color: var(--color-text-secondary); font-style: italic; }
-        .header-totals { display: flex; gap: 30px; text-align: right; background: var(--color-bg-secondary); padding: 15px 25px; border-radius: var(--radius-lg); border: 1px solid var(--color-border); }
-        .total-item { display: flex; flex-direction: column; }
-        .total-label { margin: 0; fontSize: 0.85rem; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 1px; }
-        .total-value { margin: 5px 0 0 0; fontSize: 1.5rem; fontWeight: 500; }
-        .highlight-text { color: var(--color-accent-mint); }
-        .border-left { padding-left: 30px; border-left: 1px solid var(--color-border); }
-        .jornada-control { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
-        .jornada-input { width: 50px; background: var(--color-bg-primary); border: 1px solid var(--color-border); color: white; border-radius: 4px; text-align: center; padding: 2px; }
-        .jornada-suffix { font-size: 0.8rem; color: var(--color-text-secondary); cursor: pointer; }
-        .workspace-tabs { padding: 0 40px; display: flex; gap: 20px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-secondary); }
-        .member-select { background: var(--color-bg-primary); width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--color-border); color: var(--color-text-primary); }
-        .role-form-actions { display: flex; gap: 5px; margin-top: 5px; }
-        .action-btn { padding: 5px 10px; }
-        .tasks-main { animation-delay: 0.1s; }
-        .proposal-view-container { padding: 30px 40px; }
-        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
-
-        /* ── Skeleton al cambiar versión ── */
-        .tasks-skeleton-list {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          padding: 10px 0;
-        }
-        .task-skeleton-row {
-          height: 38px;
-          border-radius: var(--radius-md);
-        }
-        @keyframes skeleton-pulse {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0.45; }
-        }
-        .skeleton {
-          background: linear-gradient(
-            90deg,
-            var(--color-bg-tertiary) 25%,
-            rgba(72,229,194,0.08) 50%,
-            var(--color-bg-tertiary) 75%
-          );
-          background-size: 200% 100%;
-          animation: shimmer 1.4s ease-in-out infinite, skeleton-pulse 1.4s ease-in-out infinite;
-        }
-        @keyframes shimmer {
-          0%   { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-      `}</style>
     </div>
   );
 }
