@@ -105,32 +105,13 @@ export default function Login() {
 
   if (verificationMode) {
     return (
-      <div className="login-wrapper" style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        width: '100vw', 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        zIndex: 1000 
-      }}>
-        <div className="login-card animate-fade-in" style={{ 
-          textAlign: 'center', 
-          width: '100%',
-          maxWidth: '480px', 
-          padding: '48px',
-          background: 'rgba(28, 37, 65, 0.95)', 
-          backdropFilter: 'blur(30px)',
-          border: '1px solid rgba(72, 229, 194, 0.2)',
-          boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.6)',
-          borderRadius: '32px'
-        }}>
+      <div className="login-wrapper auth-overlay-fixed">
+        <div className="login-card animate-fade-in auth-card-premium">
           <div className="verification-icon-container">
             <ShieldCheck size={48} />
           </div>
-          <h1 className="logo" style={{ fontSize: '2rem', marginBottom: '8px' }}>Verifica tu Correo</h1>
-          <p className="subtitle" style={{ fontSize: '0.95rem', marginBottom: '24px' }}>
+          <h1 className="logo auth-title-large">Verifica tu Correo</h1>
+          <p className="subtitle auth-subtitle-muted">
             Protegemos tu cuenta. Introduce el código enviado a:<br/>
             <span className="email-highlight">{email}</span>
           </p>
@@ -153,15 +134,16 @@ export default function Login() {
               className="otp-hidden-input"
               disabled={loading}
               autoFocus
+              title="Código de verificación de 6 dígitos"
+              aria-label="Ingresa el código de verificación de 6 dígitos"
             />
             <div className="otp-helper-text">El código expira en pocos minutos</div>
           </div>
 
           <button 
             onClick={handleVerify} 
-            className="primary" 
+            className="primary auth-button-large" 
             disabled={loading || otp.length < 6}
-            style={{ width: '100%', padding: '16px', fontSize: '1.1rem', borderRadius: '14px' }}
           >
             {loading ? <RefreshCw className="animate-spin" /> : 'Confirmar Identidad'}
           </button>
@@ -170,7 +152,7 @@ export default function Login() {
             <button onClick={handleResendCode} className="text-button flex-center" disabled={loading} style={{ opacity: 0.8 }}>
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> No recibí el código, reenviar
             </button>
-            <button onClick={() => setVerificationMode(false)} className="text-button flex-center" style={{ color: 'var(--color-text-secondary)', opacity: 0.6 }}>
+            <button onClick={() => setVerificationMode(false)} className="text-button flex-center auth-text-btn-muted">
               <ArrowLeft size={14} /> Usar otro correo
             </button>
           </footer>
@@ -281,10 +263,12 @@ export default function Login() {
         <form onSubmit={handleSubmit}>
           {!isLogin && (
             <div className="form-group">
-              <label>Nombre Completo</label>
+              <label htmlFor="registerName">Nombre Completo</label>
               <input 
+                id="registerName"
                 type="text" 
                 placeholder="Ej. Ada Lovelace" 
+                title="Tu nombre completo"
                 value={name} 
                 onChange={e => setName(e.target.value)} 
                 required 
@@ -293,10 +277,12 @@ export default function Login() {
           )}
           
           <div className="form-group">
-            <label>Correo Electrónico</label>
+            <label htmlFor="loginEmail">Correo Electrónico</label>
             <input 
+              id="loginEmail"
               type="email" 
               placeholder="correo@ejemplo.com" 
+              title="Tu correo electrónico"
               value={email} 
               onChange={e => setEmail(e.target.value)} 
               required 
@@ -304,10 +290,12 @@ export default function Login() {
           </div>
           
           <div className="form-group">
-            <label>Contraseña</label>
+            <label htmlFor="loginPassword">Contraseña</label>
             <input 
+              id="loginPassword"
               type="password" 
               placeholder="••••••••" 
+              title="Tu contraseña"
               value={password} 
               onChange={e => setPassword(e.target.value)} 
               required 
@@ -315,7 +303,7 @@ export default function Login() {
             />
           </div>
 
-          <button type="submit" className="primary" disabled={loading} style={{ width: '100%', marginTop: '10px' }}>
+          <button type="submit" className="primary auth-button-large" disabled={loading}>
             {isLogin ? <><LogIn size={18} /> Iniciar Sesión por Correo</> : <><UserPlus size={18} /> Registrarse por Correo</>}
           </button>
         </form>
