@@ -205,16 +205,19 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
                   placeholder="0 h"
                   onChange={e => handleUpdateTask(node.id, 'estimated_hours', Number(e.target.value) || 0)} 
                 />
-                <select 
-                  className="role-select" 
-                  disabled={readOnly}
-                  value={node.assigned_role_id || ''} 
-                  onChange={e => handleUpdateTask(node.id, 'assigned_role_id', e.target.value)}
-                  title="Seleccionar perfil asignado"
-                >
-                  <option value="">Ningún Perfil</option>
-                  {roles.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
+                <div className="role-select-wrapper">
+                  <select 
+                    className="role-select" 
+                    disabled={readOnly}
+                    value={node.assigned_role_id || ''} 
+                    onChange={e => handleUpdateTask(node.id, 'assigned_role_id', e.target.value)}
+                    title="Seleccionar perfil asignado"
+                  >
+                    <option value="">Ningún Perfil</option>
+                    {roles.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                  <ChevronDown size={12} className="role-select-icon" />
+                </div>
                 <button 
                   className={`icon-btn tiny ${editingDetailsId === node.id ? 'active-accent' : ''}`}
                   title="Añadir descripción" 

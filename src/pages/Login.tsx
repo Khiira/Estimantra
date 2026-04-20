@@ -6,6 +6,7 @@ export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [verificationMode, setVerificationMode] = useState(false);
   
+  const [rememberMe, setRememberMe] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -14,6 +15,15 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Cargar email recordado si existe
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('estimantra_remembered_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   // Verificación automática al llegar a 6 dígitos
   useEffect(() => {
@@ -29,7 +39,21 @@ export default function Login() {
     setMessage(null);
     try {
       if (isLogin) {
-        const { error } = await insforge.auth.signInWithPassword({ email, password });
+        // Si el usuario marcó recordar, guardamos el email y la preferencia
+        if (rememberMe) {
+          localStorage.setItem('estimantra_remembered_email', email);
+          localStorage.setItem('estimantra_remember_me', 'true');
+        } else {
+          localStorage.removeItem('estimantra_remembered_email');
+          localStorage.removeItem('estimantra_remember_me');
+        }
+
+        const { error } = await insforge.auth.signInWithPassword({ 
+          email, 
+          password,
+          // Nota: El SDK de InsForge maneja la persistencia por defecto. 
+          // Si quisiéramos cambiarla, el SDK suele aceptar opciones de persistencia aquí.
+        });
         if (error) throw error;
         window.location.href = '/'; // Full reload
       } else {
@@ -213,6 +237,23 @@ export default function Login() {
             />
           </div>
 
+          {isLogin && (
+            <div className="form-options">
+              <label className="checkbox-container">
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe} 
+                  onChange={e => setRememberMe(e.target.checked)} 
+                />
+                <span className="checkmark"></span>
+                Recordar sesión
+              </label>
+              <button type="button" className="text-button forgot-password-btn">
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          )}
+
           <button type="submit" className="primary auth-button-large" disabled={loading}>
             {isLogin ? <><LogIn size={18} /> Iniciar Sesión por Correo</> : <><UserPlus size={18} /> Registrarse por Correo</>}
           </button>
@@ -286,6 +327,60 @@ export default function Login() {
           margin-bottom: 20px;
           font-size: 0.9rem;
           color: #ffb3c1;
+        }
+        .form-options {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+          font-size: 0.85rem;
+        }
+        .checkbox-container {
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+          user-select: none;
+          color: var(--color-text-secondary);
+          gap: 10px;
+        }
+        .checkbox-container input {
+          position: absolute;
+          opacity: 0;
+          cursor: pointer;
+          height: 0;
+          width: 0;
+        }
+        .checkmark {
+          height: 18px;
+          width: 18px;
+          background-color: var(--color-bg-tertiary);
+          border: 1px solid var(--color-border);
+          border-radius: 4px;
+          position: relative;
+        }
+        .checkbox-container:hover input ~ .checkmark {
+          border-color: var(--color-accent-mint);
+        }
+        .checkbox-container input:checked ~ .checkmark {
+          background-color: var(--color-accent-mint);
+          border-color: var(--color-accent-mint);
+        }
+        .checkmark:after {
+          content: "";
+          position: absolute;
+          display: none;
+        }
+        .checkbox-container input:checked ~ .checkmark:after {
+          display: block;
+        }
+        .checkbox-container .checkmark:after {
+          left: 6px;
+          top: 2px;
+          width: 5px;
+          height: 10px;
+          border: solid white;
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
         }
         .divider {
           text-align: center;
