@@ -331,17 +331,33 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 8px 10px;
+          padding: 10px 12px;
+          padding-left: calc(var(--depth, 0) * 32px + 12px);
           border-bottom: 1px solid rgba(91, 192, 190, 0.1);
           transition: background 0.2s;
+          position: relative;
         }
         .task-node:hover {
           background: rgba(28, 37, 65, 0.6);
         }
+        
+        /* Tree lines for hierarchy */
+        .task-node.depth-1::before,
+        .task-node.depth-2::before,
+        .task-node.depth-3::before {
+          content: '';
+          position: absolute;
+          left: calc(var(--depth, 0) * 32px - 16px);
+          top: 0;
+          bottom: 0;
+          width: 2px;
+          background: rgba(72, 229, 194, 0.2);
+        }
+
         .task-left {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
           flex-grow: 1;
         }
         .task-name-input {
@@ -386,6 +402,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
         }
         .add-task-inline {
           padding: 8px 10px;
+          padding-left: calc(var(--depth, 0) * 32px + 24px);
         }
         .add-task-inline input {
           padding: 6px 12px;
@@ -425,6 +442,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
         }
         .task-details-panel {
           padding: 10px 10px 10px 0;
+          margin-left: calc(var(--depth, 0) * 32px + 32px);
         }
         .task-details-panel textarea {
           width: 100%;
