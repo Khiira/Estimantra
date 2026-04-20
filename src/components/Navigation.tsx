@@ -29,8 +29,31 @@ export default function Navigation() {
   }, []);
 
   const handleLogout = async () => {
-    await insforge.auth.signOut();
-    window.location.href = '/login';
+    try {
+      // 1. Cerrar sesión en el servidor
+      await insforge.auth.signOut();
+      
+      // 2. Limpieza total de almacenamiento local
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // 3. Limpieza de Cookies
+      const cookies = document.cookie.split(";");
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i];
+        const eqPos = cookie.indexOf("=");
+        const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+        // Borrar cookie para el path actual y root
+        document.cookie = name.trim() + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+      }
+      
+      // 4. Redirección total para resetear el estado de la App
+      window.location.href = '/login';
+    } catch (err) {
+      console.error('Logout error:', err);
+      // Fallback: al menos redirigir
+      window.location.href = '/login';
+    }
   };
 
   const getInitials = (name: string) => {
