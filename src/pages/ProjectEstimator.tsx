@@ -344,8 +344,8 @@ export default function ProjectEstimator() {
 
       <div className="workspace-tabs animate-fade-in flex-between">
           <div className="flex gap-10">
-            <button className={`tab-btn ${activeTab === 'estimator' ? 'active' : ''}`} onClick={() => setActiveTab('estimator')}>Ingeniería (Matemática Automática)</button>
-            <button className={`tab-btn ${activeTab === 'proposal' ? 'active' : ''}`} onClick={() => setActiveTab('proposal')}>Resumen de Presupuesto (Exportar)</button>
+            <button className={`tab-btn ${activeTab === 'estimator' ? 'active' : ''}`} onClick={() => setActiveTab('estimator')}>Estimación</button>
+            <button className={`tab-btn ${activeTab === 'proposal' ? 'active' : ''}`} onClick={() => setActiveTab('proposal')}>Resumen</button>
           </div>
           {activeTab === 'estimator' && (
             <button 
