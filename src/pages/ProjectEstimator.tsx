@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRoute } from 'wouter';
 import { insforge } from '../lib/insforge';
-import { ArrowLeft, Plus, Check, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Plus, Check, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Link } from 'wouter';
 import TaskTree from '../components/TaskTree';
 import ProposalBuilder from '../components/ProposalBuilder';
@@ -42,6 +42,7 @@ export default function ProjectEstimator() {
   const [newRoleCost, setNewRoleCost] = useState('');
   const [orgMembers, setOrgMembers] = useState<any[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState('');
+  const [showRoles, setShowRoles] = useState(true);
 
   const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,14 +342,25 @@ export default function ProjectEstimator() {
         </div>
       </div>
 
-      <div className="workspace-tabs animate-fade-in">
-          <button className={`tab-btn ${activeTab === 'estimator' ? 'active' : ''}`} onClick={() => setActiveTab('estimator')}>Ingeniería (Matemática Automática)</button>
-          <button className={`tab-btn ${activeTab === 'proposal' ? 'active' : ''}`} onClick={() => setActiveTab('proposal')}>Resumen de Presupuesto (Exportar)</button>
+      <div className="workspace-tabs animate-fade-in flex-between">
+          <div className="flex gap-10">
+            <button className={`tab-btn ${activeTab === 'estimator' ? 'active' : ''}`} onClick={() => setActiveTab('estimator')}>Ingeniería (Matemática Automática)</button>
+            <button className={`tab-btn ${activeTab === 'proposal' ? 'active' : ''}`} onClick={() => setActiveTab('proposal')}>Resumen de Presupuesto (Exportar)</button>
+          </div>
+          {activeTab === 'estimator' && (
+            <button 
+              className="icon-btn text-button toggle-roles-btn" 
+              onClick={() => setShowRoles(!showRoles)}
+              title={showRoles ? "Ocultar Perfiles" : "Mostrar Perfiles"}
+            >
+              {showRoles ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+            </button>
+          )}
       </div>
 
       {activeTab === 'estimator' ? (
-      <div className="workspace-grid padding-top-20">
-        <aside className="roles-panel animate-fade-in">
+      <div className={`workspace-grid padding-top-20 ${!showRoles ? 'roles-hidden' : ''}`}>
+        <aside className={`roles-panel animate-fade-in ${!showRoles ? 'collapsed' : ''}`}>
           <div className="panel-header">
             <h3>Perfiles Técnicos</h3>
             {!editorUser && (

@@ -942,12 +942,24 @@ button:disabled {
   border-bottom-color: var(--color-accent-mint);
 }
 
+/* Layout Utilities */
+.flex { display: flex; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.gap-10 { gap: 10px; }
+.flex-1 { flex: 1; }
+
 .workspace-grid {
   display: grid;
-  grid-template-columns: 310px 1fr; /* Un poco más de ancho para el aside */
-  gap: 24px;
+  grid-template-columns: 320px 1fr;
+  gap: 32px;
   padding: 30px 40px;
   flex-grow: 1;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.workspace-grid.roles-hidden {
+  grid-template-columns: 0px 1fr;
+  gap: 0;
 }
 
 .roles-panel, .tasks-panel {
@@ -958,6 +970,26 @@ button:disabled {
   border-radius: 24px;
   padding: 32px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.roles-panel {
+  width: 320px;
+  min-width: 320px;
+  opacity: 1;
+  transform: translateX(0);
+  overflow: hidden;
+}
+
+.roles-panel.collapsed {
+  opacity: 0;
+  transform: translateX(-40px);
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  pointer-events: none;
 }
 
 .tasks-panel {
@@ -968,13 +1000,15 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  min-height: 40px;
 }
 
 .panel-header h3 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-weight: 600;
+  color: var(--color-text-primary);
 }
 .role-item {
   display: flex;
