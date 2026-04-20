@@ -176,41 +176,51 @@ export default function OrganizationSettings() {
   }
 
   return (
-    <div className="container" style={{ padding: '40px 20px', maxWidth: '800px' }}>
-      <header className="flex" style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '40px' }}>
+    <div className="container settings-container-limited">
+      <header className="settings-header-row">
         <Link href="/">
           <button className="icon-btn outline" title="Volver al Dashboard">
             <ArrowLeft size={20} />
           </button>
         </Link>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="settings-title-group">
+          <div className="settings-title-group">
             {isEditingName ? (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div className="flex gap-2 align-center">
                 <input 
-                  title="Nuevo nombre"
+                  id="orgNameInput"
+                  title="Nuevo nombre de la organización"
                   type="text" 
                   value={editName} 
                   onChange={e => setEditName(e.target.value)} 
                   autoFocus 
-                  style={{ fontSize: '1.2rem', padding: '4px 12px' }}
+                  className="settings-input-edit"
                 />
-                <button className="primary icon-btn" onClick={handleUpdateName} disabled={actionLoading}>
+                <button 
+                  className="primary icon-btn" 
+                  onClick={handleUpdateName} 
+                  disabled={actionLoading}
+                  title="Guardar nuevo nombre"
+                >
                   <Save size={16} />
                 </button>
-                <button className="outline icon-btn" onClick={() => setIsEditingName(false)}>
+                <button 
+                  className="outline icon-btn" 
+                  onClick={() => setIsEditingName(false)}
+                  title="Cancelar edición"
+                >
                   <X size={16} />
                 </button>
               </div>
             ) : (
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h2 className="margin-0 flex align-center gap-2">
                 <Building size={24} color="var(--color-accent-mint)"/> 
                 {activeOrganization.name}
                 {isAdmin && (
                   <button 
                     className="text-button" 
                     onClick={() => { setEditName(activeOrganization.name); setIsEditingName(true); }}
-                    style={{ padding: '4px', opacity: 0.6 }}
+                    title="Editar nombre de la organización"
                   >
                     <Edit3 size={16} />
                   </button>
@@ -218,79 +228,77 @@ export default function OrganizationSettings() {
               </h2>
             )}
           </div>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+          <p className="settings-id-badge">
             ID: {activeOrganization.id}
           </p>
         </div>
       </header>
 
       {isAdmin && (
-        <section className="settings-panel animate-fade-in" style={{ animationDelay: '0.05s', marginBottom: '30px', borderLeft: '4px solid var(--color-accent-mint)' }}>
-          <h3 style={{ marginTop: 0 }}><Settings size={18} style={{ marginRight: '8px', verticalAlign: 'text-bottom' }} /> Ajustes de Administración</h3>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
+        <section className="settings-panel animate-fade-in settings-admin-notice">
+          <h3 className="margin-0 flex align-center gap-2">
+            <Settings size={18} /> Ajustes de Administración
+          </h3>
+          <p className="settings-subtitle-muted margin-0">
             Tienes control total sobre este espacio de trabajo.
           </p>
         </section>
       )}
 
-      <section className="settings-panel animate-fade-in" style={{ animationDelay: '0.1s' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3><Users size={18} style={{marginRight: '8px', verticalAlign: 'text-bottom'}}/> Miembros del Equipo</h3>
-          <button className="primary" onClick={handleGenerateInvite}>
+      <section className="settings-panel animate-fade-in">
+        <div className="settings-panel-header">
+          <h3><Users size={18} /> Miembros del Equipo</h3>
+          <button className="primary" onClick={handleGenerateInvite} title="Generar enlace de invitación">
             <Mail size={16} /> Generar Invitación Mágica
           </button>
         </div>
 
         {inviteToken && (
-          <div style={{ background: 'rgba(72,229,194,0.1)', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid var(--color-accent-mint)'}}>
-            <p style={{marginTop: 0, color: 'var(--color-accent-mint)', fontSize: '0.9rem'}}>Comparte este enlace de un solo uso con tu colega:</p>
-            <div style={{display: 'flex', gap: '10px'}}>
-              <input title="Enlace de invitación" placeholder="Enlace de invitación" type="text" readOnly value={`${window.location.origin}/invite?token=${inviteToken}`} style={{flexGrow: 1, fontFamily: 'monospace'}} />
-              <button className="outline" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/invite?token=${inviteToken}`)}>Copiar</button>
+          <div className="invite-token-card">
+            <p>Comparte este enlace de un solo uso con tu colega:</p>
+            <div className="flex gap-2">
+              <input 
+                id="inviteLinkInput"
+                title="Enlace de invitación" 
+                placeholder="Enlace de invitación" 
+                type="text" 
+                readOnly 
+                value={`${window.location.origin}/invite?token=${inviteToken}`} 
+                className="flex-1 font-mono" 
+              />
+              <button className="outline" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/invite?token=${inviteToken}`)} title="Copiar enlace al portapapeles">Copiar</button>
             </div>
           </div>
         )}
 
-        {/* Sección de Código de Acceso (Permanente) */}
-        <div style={{ 
-          background: 'rgba(28, 37, 65, 0.4)', 
-          padding: '20px', 
-          borderRadius: '16px', 
-          marginTop: '25px',
-          border: '1px dashed var(--color-border)',
-          textAlign: 'center'
-        }}>
-          <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            Código de Acceso del Equipo
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px' }}>
-            <span style={{ 
-              fontSize: '1.8rem', 
-              fontWeight: '800', 
-              color: 'var(--color-accent-mint)', 
-              letterSpacing: '2px',
-              fontFamily: 'monospace'
-            }}>
+        <div className="access-code-display-card">
+          <p className="access-code-label">Código de Acceso del Equipo</p>
+          <div className="flex align-center justify-center gap-3">
+            <span className="access-code-text">
               {activeOrganization.join_code || '---'}
             </span>
-            <button className="outline" style={{ padding: '8px 12px', fontSize: '0.8rem' }} onClick={() => navigator.clipboard.writeText(activeOrganization.join_code)}>
+            <button 
+                className="outline" 
+                onClick={() => navigator.clipboard.writeText(activeOrganization.join_code)}
+                title="Copiar código del equipo"
+            >
               Copiar Código
             </button>
           </div>
-          <p style={{ margin: '10px 0 0 0', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+          <p className="settings-id-badge" style={{ marginTop: '10px' }}>
             Los nuevos miembros pueden unirse ingresando este código al iniciar sesión.
           </p>
         </div>
         
         {loading ? (
-          <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
-             <div className="skeleton" style={{height: '76px', width: '100%', borderRadius: 'var(--radius-md)'}}></div>
-             <div className="skeleton" style={{height: '76px', width: '100%', borderRadius: 'var(--radius-md)'}}></div>
+          <div className="flex flex-column gap-2">
+             <div className="skeleton radius-md" style={{ height: '76px' }}></div>
+             <div className="skeleton radius-md" style={{ height: '76px' }}></div>
           </div>
         ) : (
           <div className="members-list">
             {members.length === 0 ? (
-              <p className="empty-msg" style={{color: 'var(--color-text-muted)'}}>No hay otros miembros.</p>
+              <p className="empty-msg text-muted">No hay otros miembros.</p>
             ) : (
               members.map((m) => (
                 <div key={m.user_id} className="member-card">
@@ -333,34 +341,44 @@ export default function OrganizationSettings() {
         )}
       </section>
 
-      <section className="settings-panel animate-fade-in" style={{ animationDelay: '0.2s', marginTop: '30px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3><Building size={18} style={{marginRight: '8px', verticalAlign: 'text-bottom'}}/> Mis Espacios de Trabajo</h3>
-          <button className="outline" onClick={() => setShowCreateForm(!showCreateForm)}>
+      <section className="settings-panel animate-fade-in">
+        <div className="settings-panel-header">
+          <h3><Building size={18} /> Mis Espacios de Trabajo</h3>
+          <button className="outline" onClick={() => setShowCreateForm(!showCreateForm)} title="Ver formulario de creación">
             + Nueva Organización
           </button>
         </div>
 
         {showCreateForm && (
-          <form onSubmit={handleCreateOrganization} style={{ background: 'var(--color-bg-tertiary)', padding: '20px', borderRadius: 'var(--radius-md)', marginBottom: '20px', display: 'flex', gap: '10px' }}>
-            <input title="Nombre de la organización" type="text" placeholder="Nombre (Ej: Agencia Sur)" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} required style={{flexGrow: 1}} autoFocus />
-            <button type="submit" className="primary">Crear y Entrar</button>
+          <form onSubmit={handleCreateOrganization} className="flex gap-2 bg-tertiary padding-20 radius-md margin-bottom-20">
+            <input 
+                id="newOrgInput"
+                title="Nombre de la nueva organización" 
+                type="text" 
+                placeholder="Nombre (Ej: Agencia Sur)" 
+                value={newOrgName} 
+                onChange={e => setNewOrgName(e.target.value)} 
+                required 
+                className="flex-1" 
+                autoFocus 
+            />
+            <button type="submit" className="primary" title="Crear y entrar a la nueva organización">Crear y Entrar</button>
           </form>
         )}
 
         <div className="members-list">
           {myOrganizations.map(org => (
-            <div key={org.id} className="member-card" style={{ background: activeOrganization?.id === org.id ? 'rgba(72,229,194,0.05)' : 'transparent' }}>
+            <div key={org.id} className={`member-card ${activeOrganization?.id === org.id ? 'bg-mint-soft' : ''}`}>
               <div className="member-info">
                 <h4>
                   {org.name} 
-                  {activeOrganization?.id === org.id && <span className="badge" style={{marginLeft: '10px'}}>Actual</span>}
+                  {activeOrganization?.id === org.id && <span className="badge margin-left-10">Actual</span>}
                 </h4>
-                <p style={{fontSize: '0.8rem'}}>ID: {org.id}</p>
+                <p className="font-size-sm">ID: {org.id}</p>
               </div>
               <div className="member-actions">
                 {activeOrganization?.id !== org.id && (
-                  <button className="primary text-button" onClick={() => setActiveOrganization(org)}>
+                  <button className="primary text-button" onClick={() => setActiveOrganization(org)} title={`Cambiar a ${org.name}`}>
                     Entrar aquí
                   </button>
                 )}
@@ -371,28 +389,35 @@ export default function OrganizationSettings() {
       </section>
 
       {isAdmin && (
-        <section className="settings-panel animate-fade-in danger-zone" style={{ animationDelay: '0.3s', marginTop: '40px', borderColor: 'rgba(239, 71, 111, 0.4)' }}>
-          <h3 style={{ color: 'var(--color-danger)' }}><Trash2 size={18} style={{ marginRight: '8px', verticalAlign: 'text-bottom' }} /> Zona de Peligro</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '20px' }}>
+        <section className="settings-panel animate-fade-in danger-zone-card">
+          <h3 className="danger-zone-title">
+            <Trash2 size={18} /> Zona de Peligro
+          </h3>
+          <p className="settings-subtitle-muted margin-bottom-20">
             Eliminar esta organización borrará permanentemente todos sus proyectos y datos asociados. Esta acción no se puede deshacer.
           </p>
           
-          <div className="form-group" style={{ marginBottom: '15px' }}>
-            <label style={{ fontSize: '0.8rem' }}>Escribe <strong>{activeOrganization.name}</strong> para confirmar</label>
+          <div className="form-group margin-bottom-20">
+            <label htmlFor="confirmDeleteName" className="font-size-sm">
+                Escribe <strong>{activeOrganization.name}</strong> para confirmar
+            </label>
             <input 
+              id="confirmDeleteName"
               type="text" 
               placeholder="Confirmar nombre" 
+              title="Confirmar eliminación escribiendo el nombre de la organización"
               value={confirmDeleteName} 
               onChange={e => setConfirmDeleteName(e.target.value)} 
-              style={{ borderColor: confirmDeleteName === activeOrganization.name ? 'var(--color-danger)' : 'var(--color-border)' }}
+              className="danger-confirm-input"
+              style={{ borderColor: confirmDeleteName === activeOrganization.name ? 'var(--color-danger)' : '' }}
             />
           </div>
 
           <button 
-            className="danger" 
+            className="danger auth-button-large" 
             disabled={confirmDeleteName !== activeOrganization.name || actionLoading}
             onClick={handleDeleteOrganization}
-            style={{ width: '100%', padding: '12px' }}
+            title="Eliminar organización permanentemente"
           >
             {actionLoading ? 'Eliminando...' : 'Eliminar Organización Definitivamente'}
           </button>

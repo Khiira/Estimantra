@@ -684,3 +684,123 @@ button:disabled {
   color: var(--color-accent-mint) !important;
 }
 
+/* ── Organization Settings Styles ── */
+.settings-container-limited {
+  padding: 40px 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-header-row {
+  display: flex !important;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.settings-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-title-group h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-input-edit {
+  font-size: 1.2rem !important;
+  padding: 8px 16px !important;
+  background: var(--color-bg-tertiary) !important;
+  border-radius: 10px !important;
+}
+
+.settings-id-badge {
+  margin: 4px 0 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.settings-admin-notice {
+  margin-bottom: 30px;
+  border-left: 4px solid var(--color-accent-mint);
+  background: rgba(72, 229, 194, 0.05);
+  padding: 20px;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+.settings-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.invite-token-card {
+  background: rgba(72, 229, 194, 0.1);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(72, 229, 194, 0.2);
+}
+
+.invite-token-card p {
+  margin-top: 0;
+  color: var(--color-accent-mint);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.access-code-display-card {
+  background: rgba(0, 0, 0, 0.25);
+  padding: 24px;
+  border-radius: 20px;
+  margin: 25px 0;
+  border: 1px dashed var(--color-border);
+  text-align: center;
+}
+
+.access-code-label {
+  margin: 0 0 12px 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+}
+
+.access-code-text {
+  font-size: 2.221rem;
+  font-weight: 800;
+  color: var(--color-accent-mint);
+  letter-spacing: 3px;
+  font-family: var(--font-mono, monospace);
+  line-height: 1;
+}
+
+.danger-zone-card {
+  border-color: rgba(239, 71, 111, 0.4) !important;
+  background: rgba(239, 71, 111, 0.02) !important;
+  margin-top: 40px;
+}
+
+.danger-zone-title {
+  color: var(--color-danger);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 0;
+}
+
+.danger-confirm-input {
+  border-color: var(--color-border);
+  transition: border-color 0.2s;
+}
+
+.danger-confirm-input:focus {
+  border-color: var(--color-danger) !important;
+}
+
