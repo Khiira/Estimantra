@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { useSession } from '../auth/SessionContext';
 import { insforge } from '../lib/insforge';
 import { 
@@ -13,10 +14,8 @@ import {
   Building,
   Plus,
   FolderPlus,
-  ArrowLeft,
   Users,
-  Settings,
-  Copy
+  Settings
 } from 'lucide-react';
 
 export default function Profile() {
@@ -30,172 +29,30 @@ export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
-  // Estado de gestión de equipos
-  const [teamPanel, setTeamPanel] = useState<null | 'selection' | 'create' | 'join'>(null);
+  // Modales de Equipos
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [teamLoading, setTeamLoading] = useState(false);
   const [teamMessage, setTeamMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
-  // Modal de Detalles de Equipo
-  const [showTeamModal, setShowTeamModal] = useState(false);
-  const [selectedTeam, setSelectedTeam] = useState<any>(null);
-  const [copyStatus, setCopyStatus] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [deleteConfirmName, setDeleteConfirmName] = useState('');
-  const [deleting, setDeleting] = useState(false);
-
-   // Estado de miembros del equipo
-  const [members, setMembers] = useState<any[]>([]);
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (user) {
       setName(user.user_metadata?.name || '');
       setEmail(user.email || '');
     }
-    // Abrir panel de equipos si viene desde nav
-    if (window.location.hash === '#teams') {
-      setTeamPanel('selection');
-    }
   }, [user]);
-
-  // Manejar tiempo real para miembros cuando se abre un equipo
-  useEffect(() => {
-    let realtimeCleanup: (() => void) | undefined;
-
-    if (showTeamModal && selectedTeam) {
-      loadTeamMembers();
-      setupTeamRealtime().then(cleanup => {
-        realtimeCleanup = cleanup;
-      });
-    }
-
-    return () => {
-      if (realtimeCleanup) realtimeCleanup();
-      if (selectedTeam) {
-        insforge.realtime.unsubscribe(`org_members:${selectedTeam.id}`);
-      }
-    };
-  }, [showTeamModal, selectedTeam]);
-
-  const loadTeamMembers = async () => {
-    if (!selectedTeam) return;
-    try {
-      // Nota: Necesitamos unir con la info de usuario si el SDK lo permite, 
-      // o usar los campos que tengamos en organization_members
-      const { data, error } = await insforge.database
-        .from('organization_members')
-        .select('*, user_metadata') // Asumiendo que user_metadata está accesible o es parte de la lógica del SDK
-        .eq('org_id', selectedTeam.id);
-      
-      if (error) throw error;
-      if (data) setMembers(data);
-    } catch (err) {
-      console.error('Error cargando miembros:', err);
-    }
-  };
-
-  const setupTeamRealtime = async () => {
-    if (!selectedTeam) return;
-    
-    await insforge.realtime.connect();
-    // Suscribirse a cambios en los miembros de esta organización específica
-    await insforge.realtime.subscribe(`org_members:${selectedTeam.id}`);
-    
-    const handleChange = () => loadTeamMembers();
-
-    insforge.realtime.on('INSERT_organization_member', handleChange);
-    insforge.realtime.on('UPDATE_organization_member', handleChange);
-    insforge.realtime.on('DELETE_organization_member', handleChange);
-
-    return () => {
-      insforge.realtime.off('INSERT_organization_member', handleChange);
-      insforge.realtime.off('UPDATE_organization_member', handleChange);
-      insforge.realtime.off('DELETE_organization_member', handleChange);
-    };
-  };
-
-  const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopyStatus('code');
-    setTimeout(() => setCopyStatus(null), 2000);
-  };
-
-  const handleUpdateTeamName = async () => {
-    if (!editName.trim() || !selectedTeam) return;
-    setTeamLoading(true);
-    try {
-      const { error } = await insforge.database
-        .from('organizations')
-        .update({ name: editName })
-        .eq('id', selectedTeam.id);
-      
-      if (error) throw error;
-      
-      // Actualizar estado local
-      await loadOrganizations();
-      setSelectedTeam({ ...selectedTeam, name: editName });
-      setIsEditing(false);
-      setMessage({ text: 'Nombre del equipo actualizado.', type: 'success' });
-    } catch (err: any) {
-      setMessage({ text: err.message, type: 'error' });
-    } finally {
-      setTeamLoading(false);
-    }
-  };
-
-  const handleDeleteTeam = async () => {
-    if (deleteConfirmName !== selectedTeam?.name) return;
-    
-    // 1. Actualización Optimista: Cerrar modal y quitar de la vista inmediatamente
-    const teamToRemoveId = selectedTeam.id;
-    setShowTeamModal(false);
-    setSelectedTeam(null);
-    setDeleteConfirmName('');
-    
-    setDeleting(true);
-    try {
-      const { error } = await insforge.database
-        .from('organizations')
-        .delete()
-        .eq('id', teamToRemoveId);
-      
-      if (error) throw error;
-      
-      // Pequeña pausa para asegurar consistencia en el backend antes de la sincronización final
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      await loadOrganizations();
-      
-      // Si era la activa, limpiar
-      if (activeOrganization?.id === teamToRemoveId) {
-        setActiveOrganization(null);
-      }
-      
-      setMessage({ text: `Equipo eliminado definitivamente.`, type: 'success' });
-    } catch (err: any) {
-      console.error('Delete error:', err);
-      setMessage({ text: 'Error al eliminar el equipo. Por favor intenta de nuevo.', type: 'error' });
-      // Sincronizar de nuevo para restaurar si falló
-      await loadOrganizations();
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
     try {
-      // 1. Actualizar Perfil (nombre y métadata)
-      const { error: dbErr } = await insforge.auth.setProfile({
-        name
-      });
-      
+      const { error: dbErr } = await insforge.auth.setProfile({ name });
       if (dbErr) throw dbErr;
-
       setMessage({ text: 'Perfil actualizado con éxito.', type: 'success' });
     } catch (err: any) {
       setMessage({ text: err.message || 'Error al actualizar perfil.', type: 'error' });
@@ -360,7 +217,7 @@ export default function Profile() {
                 <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                   <button 
                     className="outline" 
-                    onClick={() => { setSelectedTeam(org); setShowTeamModal(true); }}
+                    onClick={() => { setActiveOrganization(org); setLocation('/organization'); }}
                     style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                   >
                     <Settings size={14} /> Gestionar
@@ -379,131 +236,136 @@ export default function Profile() {
           </div>
         )}
 
-        {teamPanel === null && (
-          <button 
-            className="outline" 
-            onClick={() => setTeamPanel('selection')}
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
+          <button
+            className="outline"
+            onClick={() => { setShowCreateModal(true); setTeamMessage(null); }}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-accent-mint)', borderColor: 'var(--color-accent-mint)' }}
           >
-            <Plus size={16} /> Unirme o Crear Nuevo Equipo
+            <Plus size={16} /> Crear Equipo
           </button>
-        )}
+          <button
+            className="outline"
+            onClick={() => { setShowJoinModal(true); setTeamMessage(null); }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <FolderPlus size={16} /> Unirme por Código
+          </button>
+        </div>
+      </section>
 
-        {teamPanel === 'selection' && (
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
-            <button
-              onClick={() => { setTeamPanel('create'); setTeamMessage(null); }}
-              style={{ flex: '1', minWidth: '200px', padding: '20px', background: 'rgba(72,229,194,0.06)', border: '1px solid rgba(72,229,194,0.3)', borderRadius: '16px', cursor: 'pointer', textAlign: 'left', color: 'white', display: 'flex', flexDirection: 'column', gap: '8px' }}
-            >
-              <Users size={24} color="var(--color-accent-mint)" />
-              <strong>Crear Equipo</strong>
-              <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>Funda un nuevo espacio de trabajo.</span>
-            </button>
-            <button
-              onClick={() => { setTeamPanel('join'); setTeamMessage(null); }}
-              style={{ flex: '1', minWidth: '200px', padding: '20px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)', borderRadius: '16px', cursor: 'pointer', textAlign: 'left', color: 'white', display: 'flex', flexDirection: 'column', gap: '8px' }}
-            >
-              <FolderPlus size={24} color="var(--color-text-secondary)" />
-              <strong>Unirme por Código</strong>
-              <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>Ingresa el código de acceso del equipo.</span>
-            </button>
-            <button onClick={() => setTeamPanel(null)} style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', alignSelf: 'flex-start', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <ArrowLeft size={14} /> Cancelar
-            </button>
-          </div>
-        )}
-
-        {(teamPanel === 'create' || teamPanel === 'join') && (
-          <div style={{ marginTop: '8px', maxWidth: '400px' }}>
-            <button onClick={() => { setTeamPanel('selection'); setTeamMessage(null); }} style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem' }}>
-              <ArrowLeft size={14} /> Volver
-            </button>
+      {/* Modal: Crear Equipo */}
+      {showCreateModal && (
+        <div className="modal-overlay animate-fade-in">
+          <div className="modal-content animate-zoom-in" style={{ maxWidth: '450px' }}>
+            <header className="modal-header">
+              <h3>Crear Nuevo Equipo</h3>
+              <p>Funda un espacio de trabajo para tu agencia o proyecto.</p>
+            </header>
 
             {teamMessage && (
-              <div style={{ padding: '12px 16px', borderRadius: '10px', marginBottom: '16px', background: teamMessage.type === 'success' ? 'rgba(72,229,194,0.1)' : 'rgba(239,71,111,0.1)', borderLeft: `3px solid ${teamMessage.type === 'success' ? 'var(--color-accent-mint)' : 'var(--color-danger)'}`, color: teamMessage.type === 'success' ? 'var(--color-accent-mint)' : '#ffb3c1', fontSize: '0.9rem' }}>
+              <div className={`message-box ${teamMessage.type}`} style={{ marginBottom: '20px' }}>
                 {teamMessage.text}
               </div>
             )}
 
-            {teamPanel === 'create' && (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                if (!newOrgName.trim()) return;
-                setTeamLoading(true);
-                setTeamMessage(null);
-                try {
-                  const newOrgId = crypto.randomUUID();
-                  const { error: orgErr } = await insforge.database.from('organizations').insert([{ id: newOrgId, name: newOrgName }]);
-                  if (orgErr) throw new Error(orgErr.message);
-                  const { error: memErr } = await insforge.database.from('organization_members').insert([{ org_id: newOrgId, user_id: user.id, role: 'admin' }]);
-                  if (memErr) throw new Error(memErr.message);
-                  
-                  await loadOrganizations();
-                  setTeamMessage({ text: `Equipo "${newOrgName}" creado con éxito.`, type: 'success' });
-                  setNewOrgName('');
-                  setTeamPanel(null);
-                } catch (err: any) {
-                  setTeamMessage({ text: err.message, type: 'error' });
-                } finally {
-                  setTeamLoading(false);
-                }
-              }}>
-                <div className="form-group">
-                  <label>Nombre del Equipo</label>
-                  <input type="text" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} placeholder="Ej. Equipo de Diseño UX" required autoFocus />
-                </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!newOrgName.trim()) return;
+              setTeamLoading(true);
+              setTeamMessage(null);
+              try {
+                const newOrgId = crypto.randomUUID();
+                const { error: orgErr } = await insforge.database.from('organizations').insert([{ id: newOrgId, name: newOrgName }]);
+                if (orgErr) throw new Error(orgErr.message);
+                const { error: memErr } = await insforge.database.from('organization_members').insert([{ org_id: newOrgId, user_id: user.id, role: 'admin' }]);
+                if (memErr) throw new Error(memErr.message);
+                
+                await loadOrganizations();
+                setTeamMessage({ text: `Equipo "${newOrgName}" creado con éxito.`, type: 'success' });
+                setTimeout(() => setShowCreateModal(false), 1500);
+              } catch (err: any) {
+                setTeamMessage({ text: err.message, type: 'error' });
+              } finally {
+                setTeamLoading(false);
+              }
+            }}>
+              <div className="form-group">
+                <label>Nombre del Equipo</label>
+                <input type="text" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} placeholder="Ej. Agencia de Marketing" required autoFocus />
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="outline" onClick={() => setShowCreateModal(false)}>Cancelar</button>
                 <button type="submit" className="primary" disabled={teamLoading}>{teamLoading ? 'Creando...' : 'Crear Equipo'}</button>
-              </form>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Unirse a Equipo */}
+      {showJoinModal && (
+        <div className="modal-overlay animate-fade-in">
+          <div className="modal-content animate-zoom-in" style={{ maxWidth: '450px' }}>
+            <header className="modal-header">
+              <h3>Unirse a Equipo</h3>
+              <p>Ingresa el código de 8 caracteres que te compartió tu administrador.</p>
+            </header>
+
+            {teamMessage && (
+              <div className={`message-box ${teamMessage.type}`} style={{ marginBottom: '20px' }}>
+                {teamMessage.text}
+              </div>
             )}
 
-            {teamPanel === 'join' && (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                if (!joinCode.trim()) return;
-                setTeamLoading(true);
-                setTeamMessage(null);
-                try {
-                  const { data: org, error: orgErr } = await insforge.database
-                    .from('organizations')
-                    .select('id, name')
-                    .eq('join_code', joinCode.toUpperCase())
-                    .single();
-                  if (orgErr || !org) throw new Error('Código no válido o el equipo no existe.');
-                  const { error: memErr } = await insforge.database
-                    .from('organization_members')
-                    .insert([{ org_id: org.id, user_id: user.id, role: 'member' }]);
-                  if (memErr) throw new Error('Error al unirse: ' + memErr.message);
-                  
-                  await loadOrganizations();
-                  setActiveOrganization(org);
-                  setTeamMessage({ text: `Te has unido a "${org.name}".`, type: 'success' });
-                  setJoinCode('');
-                  setTeamPanel(null);
-                } catch (err: any) {
-                  setTeamMessage({ text: err.message, type: 'error' });
-                } finally {
-                  setTeamLoading(false);
-                }
-              }}>
-                <div className="form-group">
-                  <label>Código de Acceso</label>
-                  <input 
-                    type="text" 
-                    value={joinCode} 
-                    onChange={e => setJoinCode(e.target.value.toUpperCase())} 
-                    placeholder="ABC123XY"
-                    required
-                    maxLength={8}
-                    autoFocus
-                    style={{ textAlign: 'center', letterSpacing: '6px', fontWeight: 'bold', fontSize: '1.2rem' }}
-                  />
-                </div>
-                <button type="submit" className="primary" disabled={teamLoading}>{teamLoading ? 'Verificando...' : 'Unirme al Equipo'}</button>
-              </form>
-            )}
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!joinCode.trim()) return;
+              setTeamLoading(true);
+              setTeamMessage(null);
+              try {
+                const { data: org, error: orgErr } = await insforge.database
+                  .from('organizations')
+                  .select('id, name')
+                  .eq('join_code', joinCode.toUpperCase())
+                  .single();
+                if (orgErr || !org) throw new Error('Código no válido o el equipo no existe.');
+                const { error: memErr } = await insforge.database
+                  .from('organization_members')
+                  .insert([{ org_id: org.id, user_id: user.id, role: 'member' }]);
+                if (memErr) throw new Error('Error al unirse: ' + memErr.message);
+                
+                await loadOrganizations();
+                setActiveOrganization(org);
+                setTeamMessage({ text: `¡Te has unido a ${org.name}!`, type: 'success' });
+                setTimeout(() => setShowJoinModal(false), 1500);
+              } catch (err: any) {
+                setTeamMessage({ text: err.message, type: 'error' });
+              } finally {
+                setTeamLoading(false);
+              }
+            }}>
+              <div className="form-group">
+                <label>Código de Acceso</label>
+                <input 
+                  type="text" 
+                  value={joinCode} 
+                  onChange={e => setJoinCode(e.target.value.toUpperCase())} 
+                  placeholder="ABC123XY"
+                  required
+                  maxLength={8}
+                  autoFocus
+                  style={{ textAlign: 'center', letterSpacing: '8px', fontWeight: 'bold', fontSize: '1.4rem' }}
+                />
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="outline" onClick={() => setShowJoinModal(false)}>Cancelar</button>
+                <button type="submit" className="primary" disabled={teamLoading}>{teamLoading ? 'Verificando...' : 'Unirme'}</button>
+              </div>
+            </form>
           </div>
-        )}
-      </section>
+        </div>
+      )}
 
       {/* Zona 4: Plan y Facturación (Placeholder) */}
       <section id="billing" className="profile-section">
@@ -529,139 +391,6 @@ export default function Profile() {
         </button>
       </section>
 
-      {/* Modal de Gestión de Equipo */}
-      {showTeamModal && selectedTeam && (
-        <div className="modal-overlay animate-fade-in">
-          <div className="modal-content animate-zoom-in" style={{ maxWidth: '520px' }}>
-            <header className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <div style={{ padding: '14px', background: 'rgba(72,229,194,0.1)', borderRadius: '16px' }}>
-                  <Users size={28} color="var(--color-accent-mint)" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  {isEditing ? (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input 
-                        type="text" 
-                        value={editName} 
-                        onChange={e => setEditName(e.target.value)}
-                        style={{ padding: '8px 12px', fontSize: '1rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--color-accent-mint)', borderRadius: '8px', color: 'white', flex: 1 }}
-                        autoFocus
-                      />
-                      <button className="primary" onClick={handleUpdateTeamName} disabled={teamLoading} style={{ padding: '8px 12px' }}>
-                        {teamLoading ? '...' : <Save size={16} />}
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <h3 style={{ margin: 0, fontSize: '1.6rem' }}>{selectedTeam.name}</h3>
-                      {selectedTeam.role === 'admin' && (
-                        <button 
-                          onClick={() => { setEditName(selectedTeam.name); setIsEditing(true); }}
-                          style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '4px' }}
-                        >
-                          <Settings size={16} />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem' }}>Configuración Administrativa</p>
-                </div>
-              </div>
-            </header>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* Código de Invitación */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '24px', borderRadius: '20px', border: '1px solid var(--color-border)' }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '12px', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>Código de Invitación</label>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <code style={{ fontSize: '1.8rem', fontWeight: 800, letterSpacing: '6px', color: 'var(--color-accent-mint)', fontFamily: 'monospace' }}>
-                    {selectedTeam.join_code}
-                  </code>
-                  <button 
-                    onClick={() => handleCopyCode(selectedTeam.join_code)}
-                    style={{ background: 'rgba(72,229,194,0.1)', border: 'none', padding: '12px', borderRadius: '12px', color: 'var(--color-accent-mint)', cursor: 'pointer', transition: 'all 0.2s' }}
-                    title="Copiar código"
-                  >
-                    {copyStatus === 'code' ? <CheckCircle2 size={20} /> : <Copy size={20} />}
-                  </button>
-                </div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '12px', lineHeight: '1.5' }}>
-                  Comparte este código único para que otros miembros se unan a tu equipo.
-                </p>
-              </div>
-
-               {/* Lista de Miembros */}
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '24px', borderRadius: '20px', border: '1px solid var(--color-border)' }}>
-                  <label style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                    <Users size={14} /> Miembros del Equipo ({members.length})
-                  </label>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto', paddingRight: '8px' }}>
-                    {members.map((member: any) => (
-                      <div key={member.user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '32px', height: '32px', background: 'rgba(72,229,194,0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-accent-mint)' }}>
-                            {member.user_metadata?.name?.[0] || 'U'}
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{member.user_metadata?.name || 'Usuario'}</span>
-                            <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>{member.user_role === 'admin' ? 'Administrador' : 'Miembro'}</span>
-                          </div>
-                        </div>
-                        {member.user_id === user.id && (
-                          <span style={{ fontSize: '0.65rem', background: 'rgba(72,229,194,0.2)', color: 'var(--color-accent-mint)', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>TÚ</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              {/* Danger Zone */}
-              {selectedTeam.role === 'admin' && (
-                <div style={{ padding: '24px', borderRadius: '20px', border: '1px solid rgba(239, 71, 111, 0.2)', background: 'rgba(239, 71, 111, 0.02)' }}>
-                  <h4 style={{ color: 'var(--color-danger)', marginTop: 0, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Trash2 size={18} /> Zona de Peligro
-                  </h4>
-                  <p style={{ fontSize: '0.85rem', color: '#ffb3c1', marginBottom: '20px' }}>
-                    Al eliminar este equipo, se borrarán permanentemente todos los proyectos y datos asociados. Esta acción no se puede deshacer.
-                  </p>
-                  
-                  <div className="form-group" style={{ marginBottom: '16px' }}>
-                    <label style={{ color: 'var(--color-text-secondary)', fontSize: '0.8rem' }}>Escribe <strong>{selectedTeam.name}</strong> para confirmar</label>
-                    <input 
-                      type="text" 
-                      placeholder="Nombre del equipo"
-                      value={deleteConfirmName}
-                      onChange={e => setDeleteConfirmName(e.target.value)}
-                      style={{ marginTop: '8px' }}
-                    />
-                  </div>
-
-                  <button 
-                    className="danger" 
-                    disabled={deleteConfirmName !== selectedTeam.name || deleting}
-                    onClick={handleDeleteTeam}
-                    style={{ width: '100%', padding: '14px', borderRadius: '12px', fontWeight: 600, transition: 'all 0.3s' }}
-                  >
-                    {deleting ? 'Eliminando...' : 'Eliminar Equipo Definitivamente'}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="modal-footer" style={{ marginTop: '30px' }}>
-              <button 
-                className="outline" 
-                onClick={() => { setShowTeamModal(false); setIsEditing(false); setDeleteConfirmName(''); }}
-                style={{ borderRadius: '12px', padding: '12px 24px', border: 'none' }}
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,17 +1,45 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '../auth/SessionContext';
 import { insforge } from '../lib/insforge';
-import { Link } from 'wouter';
-import { ArrowLeft, Building, Users, Mail, Crown } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
+import { ArrowLeft, Building, Users, Mail, Crown, Trash2, Edit3, Save, X, Settings } from 'lucide-react';
 
 export default function OrganizationSettings() {
   const { user, activeOrganization, setActiveOrganization, myOrganizations, loadOrganizations } = useSession();
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [, setLocation] = useLocation();
+
+  const [editName, setEditName] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [confirmDeleteName, setConfirmDeleteName] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const isAdmin = activeOrganization?.role === 'admin';
 
   useEffect(() => {
     if (activeOrganization?.id) {
       loadMembers();
+      
+      const setupRealtime = async () => {
+        try {
+          await insforge.realtime.connect();
+          await insforge.realtime.subscribe(`org:${activeOrganization.id}`);
+        } catch (err) {
+          console.error('Error conectando a tiempo real:', err);
+        }
+      };
+
+      setupRealtime();
+      
+      const handleMemberChange = () => loadMembers();
+      insforge.realtime.on('INSERT_organization_members', handleMemberChange);
+      insforge.realtime.on('DELETE_organization_members', handleMemberChange);
+      
+      return () => {
+        insforge.realtime.off('INSERT_organization_members', handleMemberChange);
+        insforge.realtime.off('DELETE_organization_members', handleMemberChange);
+      };
     }
   }, [activeOrganization]);
 
@@ -24,6 +52,37 @@ export default function OrganizationSettings() {
 
     if (data) setMembers(data);
     setLoading(false);
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (memberId === user.id) return;
+    if (!confirm('¿Estás seguro de que deseas eliminar a este miembro del equipo?')) return;
+
+    const { error } = await insforge.database
+      .from('organization_members')
+      .delete()
+      .eq('org_id', activeOrganization.id)
+      .eq('user_id', memberId);
+
+    if (error) {
+      alert('Error al eliminar miembro: ' + error.message);
+    } else {
+      loadMembers();
+    }
+  };
+
+  const handleUpdateRole = async (memberId: string, newRole: string) => {
+    const { error } = await insforge.database
+      .from('organization_members')
+      .update({ role: newRole })
+      .eq('org_id', activeOrganization.id)
+      .eq('user_id', memberId);
+
+    if (error) {
+      alert('Error al actualizar rol: ' + error.message);
+    } else {
+      loadMembers();
+    }
   };
 
   const [inviteToken, setInviteToken] = useState<string | null>(null);
@@ -71,6 +130,47 @@ export default function OrganizationSettings() {
     setNewOrgName('');
   };
 
+  const handleUpdateName = async () => {
+    if (!editName.trim() || !activeOrganization) return;
+    setActionLoading(true);
+    try {
+      const { error } = await insforge.database
+        .from('organizations')
+        .update({ name: editName })
+        .eq('id', activeOrganization.id);
+      
+      if (error) throw error;
+      
+      await loadOrganizations();
+      setIsEditingName(false);
+    } catch (err: any) {
+      alert('Error al actualizar nombre: ' + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteOrganization = async () => {
+    if (confirmDeleteName !== activeOrganization?.name) return;
+    setActionLoading(true);
+    try {
+      const { error } = await insforge.database
+        .from('organizations')
+        .delete()
+        .eq('id', activeOrganization.id);
+      
+      if (error) throw error;
+      
+      await loadOrganizations();
+      setActiveOrganization(null);
+      setLocation('/');
+    } catch (err: any) {
+      alert('Error al eliminar organización: ' + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (!activeOrganization) {
     return <div className="container">Sin organización activa.</div>;
   }
@@ -84,15 +184,54 @@ export default function OrganizationSettings() {
           </button>
         </Link>
         <div>
-          <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Building size={24} color="var(--color-accent-mint)"/> 
-            {activeOrganization.name}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {isEditingName ? (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input 
+                  title="Nuevo nombre"
+                  type="text" 
+                  value={editName} 
+                  onChange={e => setEditName(e.target.value)} 
+                  autoFocus 
+                  style={{ fontSize: '1.2rem', padding: '4px 12px' }}
+                />
+                <button className="primary icon-btn" onClick={handleUpdateName} disabled={actionLoading}>
+                  <Save size={16} />
+                </button>
+                <button className="outline icon-btn" onClick={() => setIsEditingName(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Building size={24} color="var(--color-accent-mint)"/> 
+                {activeOrganization.name}
+                {isAdmin && (
+                  <button 
+                    className="text-button" 
+                    onClick={() => { setEditName(activeOrganization.name); setIsEditingName(true); }}
+                    style={{ padding: '4px', opacity: 0.6 }}
+                  >
+                    <Edit3 size={16} />
+                  </button>
+                )}
+              </h2>
+            )}
+          </div>
           <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
-            Configuración de Empresa
+            ID: {activeOrganization.id}
           </p>
         </div>
       </header>
+
+      {isAdmin && (
+        <section className="settings-panel animate-fade-in" style={{ animationDelay: '0.05s', marginBottom: '30px', borderLeft: '4px solid var(--color-accent-mint)' }}>
+          <h3 style={{ marginTop: 0 }}><Settings size={18} style={{ marginRight: '8px', verticalAlign: 'text-bottom' }} /> Ajustes de Administración</h3>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
+            Tienes control total sobre este espacio de trabajo.
+          </p>
+        </section>
+      )}
 
       <section className="settings-panel animate-fade-in" style={{ animationDelay: '0.1s' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -168,9 +307,23 @@ export default function OrganizationSettings() {
                   </div>
                   <div className="member-actions">
                     {m.user_id !== user.id && (
-                      <button className="outline text-button" onClick={() => alert('Próximamente: Ceder puesto de Admin')}>
-                        Administrar Rol
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button 
+                          className="outline text-button" 
+                          onClick={() => handleUpdateRole(m.user_id, m.role === 'admin' ? 'member' : 'admin')}
+                          title={m.role === 'admin' ? 'Quitar Admin' : 'Hacer Admin'}
+                        >
+                          <Crown size={14} color={m.role === 'admin' ? 'gold' : 'var(--color-text-muted)'} />
+                        </button>
+                        <button 
+                          className="outline text-button danger-hover" 
+                          onClick={() => handleRemoveMember(m.user_id)}
+                          title="Eliminar Miembro"
+                          style={{ color: 'var(--color-danger)' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -216,6 +369,35 @@ export default function OrganizationSettings() {
           ))}
         </div>
       </section>
+
+      {isAdmin && (
+        <section className="settings-panel animate-fade-in danger-zone" style={{ animationDelay: '0.3s', marginTop: '40px', borderColor: 'rgba(239, 71, 111, 0.4)' }}>
+          <h3 style={{ color: 'var(--color-danger)' }}><Trash2 size={18} style={{ marginRight: '8px', verticalAlign: 'text-bottom' }} /> Zona de Peligro</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '20px' }}>
+            Eliminar esta organización borrará permanentemente todos sus proyectos y datos asociados. Esta acción no se puede deshacer.
+          </p>
+          
+          <div className="form-group" style={{ marginBottom: '15px' }}>
+            <label style={{ fontSize: '0.8rem' }}>Escribe <strong>{activeOrganization.name}</strong> para confirmar</label>
+            <input 
+              type="text" 
+              placeholder="Confirmar nombre" 
+              value={confirmDeleteName} 
+              onChange={e => setConfirmDeleteName(e.target.value)} 
+              style={{ borderColor: confirmDeleteName === activeOrganization.name ? 'var(--color-danger)' : 'var(--color-border)' }}
+            />
+          </div>
+
+          <button 
+            className="danger" 
+            disabled={confirmDeleteName !== activeOrganization.name || actionLoading}
+            onClick={handleDeleteOrganization}
+            style={{ width: '100%', padding: '12px' }}
+          >
+            {actionLoading ? 'Eliminando...' : 'Eliminar Organización Definitivamente'}
+          </button>
+        </section>
+      )}
 
       <style>{`
         .settings-panel {

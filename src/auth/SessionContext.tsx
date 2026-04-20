@@ -72,18 +72,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     
-    insforge.auth.getCurrentUser().then(async ({ data, error }) => {
+    // Solo intentar recuperar la sesión si hay un rastro local de que el usuario estuvo logueado.
+    // Esto evita que el SDK intente hacer un refresco (POST /refresh) que lance un 401 en cada carga.
+    const hasSessionTrace = !!localStorage.getItem('insforge_auth_token') || 
+                           !!localStorage.getItem('insforge.auth.token') ||
+                           document.cookie.includes('insforge');
+
+    if (!hasSessionTrace) {
+      setLoading(false);
+      return;
+    }
+
+    insforge.auth.getCurrentUser().then(async ({ data }) => {
       if (!isMounted) return;
       
-      if (error) {
-        // En lugar de borrar la sesión preventivamente, solo informamos.
-        // Esto permite que el SDK intente recuperarse si es un error transitorio.
-        console.warn('Sesión no recuperable al inicio:', error);
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
       const authUser = data?.user ?? null;
       setUser(authUser);
       
@@ -100,6 +102,42 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     return () => { isMounted = false; };
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const setupRealtime = async () => {
+      try {
+        await insforge.realtime.connect();
+        // Suscribirse a cada organización que posee el usuario
+        for (const org of myOrganizations) {
+          await insforge.realtime.subscribe(`org:${org.id}`);
+        }
+      } catch (err) {
+        console.error('Session Realtime Error:', err);
+      }
+    };
+
+    setupRealtime();
+
+    const refresh = () => loadOrganizations(user.id);
+    
+    // Escuchar eventos globales de membresía
+    insforge.realtime.on('INSERT_organization_members', refresh);
+    insforge.realtime.on('DELETE_organization_members', refresh);
+    insforge.realtime.on('UPDATE_organization_members', refresh);
+    // Escuchar si la organización misma cambia (ej: nombre editado)
+    insforge.realtime.on('UPDATE_organizations', refresh);
+    insforge.realtime.on('DELETE_organizations', refresh);
+
+    return () => {
+      insforge.realtime.off('INSERT_organization_members', refresh);
+      insforge.realtime.off('DELETE_organization_members', refresh);
+      insforge.realtime.off('UPDATE_organization_members', refresh);
+      insforge.realtime.off('UPDATE_organizations', refresh);
+      insforge.realtime.off('DELETE_organizations', refresh);
+    };
+  }, [user, myOrganizations.length]);
 
   return (
     <SessionContext.Provider value={{ user, loading, activeOrganization, setActiveOrganization, myOrganizations, loadOrganizations }}>
