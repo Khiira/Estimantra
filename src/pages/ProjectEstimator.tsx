@@ -257,37 +257,43 @@ export default function ProjectEstimator() {
     
     setIsVersioning(true);
     try {
-      // 1. Calcular nueva versión (ej: 1.0 -> 1.1)
-      const lastVersion = allVersions[allVersions.length - 1] || '1.0';
+      const sortedVersions = [...allVersions].sort((a, b) => {
+        const [aMaj, aMin] = a.split('.').map(v => parseInt(v) || 0);
+        const [bMaj, bMin] = b.split('.').map(v => parseInt(v) || 0);
+        if (aMaj !== bMaj) return aMaj - bMaj;
+        return (aMin || 0) - (bMin || 0);
+      });
+
+      const lastVersion = sortedVersions[sortedVersions.length - 1] || '1.0';
       const parts = lastVersion.split('.');
-      let nextVersion = '2.0';
+      let nextVersion = '1.1';
       
       if (parts.length >= 2) {
         const major = parseInt(parts[0]);
         const minor = parseInt(parts[1]);
         nextVersion = `${major}.${minor + 1}`;
-      } else if (!isNaN(parseInt(lastVersion))) {
-        nextVersion = `${parseInt(lastVersion) + 1}.0`;
+      } else if (parts.length === 1 && !isNaN(parseInt(parts[0]))) {
+        nextVersion = `${parts[0]}.1`;
       }
 
-      // 2. Obtener tareas actuales para clonar
-      const { data: currentTasks } = await insforge.database
+      const { data: currentTasks, error: fetchErr } = await insforge.database
          .from('tasks')
          .select('*')
          .eq('project_id', projectId)
          .eq('version', selectedVersion);
 
+      if (fetchErr) throw fetchErr;
       if (!currentTasks || currentTasks.length === 0) {
         alert("No hay tareas para clonar en esta versión.");
         setIsVersioning(false);
         return;
       }
 
-      // 3. Clonar manteniendo jerarquía
       const idMap: Record<string, string> = {};
-      
       const tasksToInsert = currentTasks.map(t => {
-        const newId = self.crypto.randomUUID();
+        const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+          ? crypto.randomUUID() 
+          : Math.random().toString(36).substring(2, 12);
         idMap[t.id] = newId;
         return {
           ...t,
@@ -303,18 +309,18 @@ export default function ProjectEstimator() {
         parent_id: t.parent_id ? (idMap[t.parent_id] || null) : null
       }));
 
-      const { error } = await insforge.database
+      const { error: insErr } = await insforge.database
         .from('tasks')
         .insert(finalTasks);
 
-      if (error) throw error;
+      if (insErr) throw insErr;
 
       setAllVersions(prev => [...prev, nextVersion]);
       setSelectedVersion(nextVersion);
-      alert(`Versión ${nextVersion} creada exitosamente.`);
+      alert(`Versión ${nextVersion} creada exitosamente basada en v${selectedVersion}.`);
     } catch (err: any) {
-      console.error(err);
-      alert(`Error al crear versión: ${err.message}`);
+      console.error('Error en versionado:', err);
+      alert(`Error al crear versión: ${err.message || 'Error desconocido'}`);
     } finally {
       setIsVersioning(false);
     }
@@ -420,7 +426,7 @@ export default function ProjectEstimator() {
       </div>
 
       {activeTab === 'estimator' ? (
-      <div className={`workspace-grid ${editorUser ? 'locked-overlay' : ''}`}>
+      <div className="workspace-grid padding-top-20">
         <aside className="roles-panel animate-fade-in">
           <div className="panel-header">
             <h3>Perfiles Técnicos</h3>

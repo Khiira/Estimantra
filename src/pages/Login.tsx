@@ -248,6 +248,100 @@ export default function Login() {
         </div>
       </div>
 
+      <style>{`
+        .login-wrapper {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          background: linear-gradient(135deg, var(--color-bg-primary) 0%, var(--color-bg-secondary) 100%);
+        }
+        .login-card {
+          background: var(--color-bg-secondary);
+          padding: 40px;
+          border-radius: var(--radius-lg);
+          box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+          width: 100%;
+          max-width: 400px;
+          border: 1px solid var(--color-border);
+        }
+        .logo {
+          color: var(--color-accent-mint);
+          font-size: 1.8rem;
+          margin-bottom: 5px;
+          text-align: center;
+          font-weight: 700;
+        }
+        .subtitle {
+          text-align: center;
+          color: var(--color-text-secondary);
+          margin-bottom: 25px;
+          font-size: 0.95rem;
+        }
+        .error-box {
+          background: rgba(239, 71, 111, 0.1);
+          border-left: 4px solid var(--color-danger);
+          padding: 10px;
+          border-radius: var(--radius-sm);
+          margin-bottom: 20px;
+          font-size: 0.9rem;
+          color: #ffb3c1;
+        }
+        .divider {
+          text-align: center;
+          margin: 20px 0;
+          position: relative;
+        }
+        .divider::before {
+          content: "";
+          position: absolute;
+          top: 50%;
+          left: 0;
+          right: 0;
+          border-top: 1px solid var(--color-border);
+          z-index: 1;
+        }
+        .divider span {
+          background: var(--color-bg-secondary);
+          padding: 0 10px;
+          color: var(--color-text-muted);
+          font-size: 0.8rem;
+          position: relative;
+          z-index: 2;
+        }
+        .oauth-buttons {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 20px;
+        }
+        .oauth-buttons button {
+          flex: 1;
+          background-color: rgba(28, 37, 65, 0.8);
+          border: 1px solid var(--color-border);
+        }
+        .oauth-buttons button:hover {
+          background-color: var(--color-bg-tertiary);
+          border-color: var(--color-accent-mint);
+        }
+        .toggle-mode {
+          text-align: center;
+          font-size: 0.9rem;
+          color: var(--color-text-secondary);
+        }
+        .text-button {
+          background: none;
+          border: none;
+          color: var(--color-accent-mint);
+          padding: 0;
+          margin-left: 8px;
+          display: inline;
+          font-size: 0.9rem;
+        }
+        .text-button:hover {
+          background: none;
+          text-decoration: underline;
+        }
+      `}</style>
     </div>
   );
 }

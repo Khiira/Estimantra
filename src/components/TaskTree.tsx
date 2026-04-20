@@ -128,33 +128,44 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
         .from('tasks')
         .update({ [field]: value })
         .eq('id', id);
-    }, 500);
+    }, 800); // 800ms debounce for text/inputs
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (readOnly) return;
     if(!confirm("¿Eliminar tarea y todas sus subtareas?")) return;
-    const { error } = await insforge.database.from('tasks').delete().eq('id', id);
-    if (!error) {
-      // Collect all descendant IDs recursively from the flat tasks array
-      const collectDescendants = (parentId: string, allTasks: any[]): string[] => {
-        const children = allTasks.filter((t: any) => t.parent_id === parentId);
-        return children.reduce((acc: string[], child: any) => {
-          return [...acc, child.id, ...collectDescendants(child.id, allTasks)];
-        }, []);
-      };
-      const idsToRemove = new Set([id, ...collectDescendants(id, tasks)]);
-      onTasksChange(tasks.filter((t: any) => !idsToRemove.has(t.id)));
+    
+    // Collect all descendant IDs recursively
+    const collectDescendants = (parentId: string, allTasks: any[]): string[] => {
+      const children = allTasks.filter((t: any) => t.parent_id === parentId);
+      return children.reduce((acc: string[], child: any) => {
+        return [...acc, child.id, ...collectDescendants(child.id, allTasks)];
+      }, []);
+    };
+    
+    const descendants = collectDescendants(id, tasks);
+    const idsToRemove = [...descendants.reverse(), id]; 
+    
+    const { error } = await insforge.database
+      .from('tasks')
+      .delete()
+      .in('id', idsToRemove);
+
+    if (error) {
+      console.error("Error al eliminar:", error);
+      alert("No se pudo eliminar la tarea: " + error.message);
+      return;
     }
+
+    const idSetToRemove = new Set(idsToRemove);
+    onTasksChange(tasks.filter((t: any) => !idSetToRemove.has(t.id)));
   };
 
   // 2. Renderizado Recursivo
   const renderTaskNode = (node: any, depth = 0) => {
     const isExpanded = expanded[node.id];
     const hasChildren = node.children && node.children.length > 0;
-    // Si tiene hijos, no debe sumar horas directas propias en el UI sino el total
-    // pero guardaremos horas propias en DB si es hoja
 
     return (
       <div key={node.id} className="task-node-wrapper">
@@ -163,20 +174,26 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
           style={{ '--depth': depth } as React.CSSProperties}
         >
           
-          <div className="task-left" onClick={() => toggleExpand(node.id)}>
+          <div className="task-left">
             {hasChildren ? (
-              <button className="icon-btn tiny">
+              <button className="icon-btn tiny" onClick={() => toggleExpand(node.id)}>
                 {isExpanded ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
               </button>
             ) : (
               <div className="spacer-node"></div> 
             )}
-            <span className="task-name">{node.task_name}</span>
+            <input 
+              className="task-name-input"
+              value={node.task_name}
+              readOnly={readOnly}
+              onChange={e => handleUpdateTask(node.id, 'task_name', e.target.value)}
+              placeholder="Nombre de la tarea..."
+              title="Editar nombre de la tarea"
+            />
           </div>
 
           <div className="task-right">
             {!hasChildren ? (
-              // Modo "Hoja": Controles directos para estimar
               <div className="task-leaf-controls">
                 <input 
                   type="number" 
@@ -207,7 +224,6 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
                 </button>
               </div>
             ) : (
-              // Modo "Rama": Muestra total heredado MÁS el botón de descripción
               <div className="task-hours gap-3">
                 <span title="Costo Parcial (Calculado)" className="flex align-center gap-1">
                   <DollarSign size={12}/> {node.totalCost.toLocaleString('en-US')}
@@ -238,7 +254,6 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
           </div>
         </div>
 
-        {/* Panel Desplegable de Descripción Opcional (Ahora para todos) */}
         {editingDetailsId === node.id && (
           <div className="task-details-panel" style={{ '--depth': depth } as React.CSSProperties}>
             <textarea 
@@ -305,6 +320,125 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
         )}
       </div>
 
+      <style>{`
+        .task-tree-container {
+          margin-top: 10px;
+        }
+        .task-node {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 10px;
+          border-bottom: 1px solid rgba(91, 192, 190, 0.1);
+          transition: background 0.2s;
+        }
+        .task-node:hover {
+          background: rgba(28, 37, 65, 0.6);
+        }
+        .task-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-grow: 1;
+        }
+        .task-name-input {
+          background: transparent;
+          border: none;
+          color: white;
+          font-weight: 500;
+          font-size: 1rem;
+          padding: 4px;
+          width: 100%;
+          outline: none;
+          border-bottom: 1px solid transparent;
+          transition: all 0.2s;
+        }
+        .task-name-input:focus {
+          border-bottom-color: var(--color-accent-mint);
+          background: rgba(255,255,255,0.05);
+        }
+        .task-right {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+        }
+        .task-hours {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          color: var(--color-accent-mint);
+          font-family: monospace;
+          background: rgba(72, 229, 194, 0.1);
+          padding: 2px 8px;
+          border-radius: var(--radius-sm);
+        }
+        .task-actions {
+          display: flex;
+          gap: 5px;
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+        .task-node:hover .task-actions {
+          opacity: 1;
+        }
+        .add-task-inline {
+          padding: 8px 10px;
+        }
+        .add-task-inline input {
+          padding: 6px 12px;
+          font-size: 0.9rem;
+          background: var(--color-bg-primary);
+        }
+        .new-root-btn {
+          margin-top: 20px;
+          color: var(--color-text-secondary);
+        }
+        .new-root-btn:hover {
+          color: var(--color-accent-mint);
+        }
+        .task-leaf-controls {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .hours-input {
+          width: 60px;
+          padding: 2px 5px;
+          text-align: right;
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.1);
+          color: var(--color-accent-mint);
+          font-family: monospace;
+          border-radius: var(--radius-sm);
+        }
+        .role-select {
+          padding: 2px 5px;
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.1);
+          color: var(--color-text-primary);
+          font-size: 0.85rem;
+          border-radius: var(--radius-sm);
+          outline: none;
+        }
+        .task-details-panel {
+          padding: 10px 10px 10px 0;
+        }
+        .task-details-panel textarea {
+          width: 100%;
+          background: rgba(0,0,0,0.15);
+          border: 1px dashed rgba(72, 229, 194, 0.3);
+          border-radius: var(--radius-sm);
+          padding: 8px;
+          font-size: 0.85rem;
+          color: var(--color-text-secondary);
+          resize: vertical;
+        }
+        .active-accent {
+          color: var(--color-accent-mint);
+          background: rgba(72, 229, 194, 0.1);
+        }
+        .spacer-node { width: 24px; }
+      `}</style>
     </div>
   );
 }
