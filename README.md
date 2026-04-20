@@ -65,5 +65,21 @@ npm run build
 
 La plataforma se despliega automáticamente mediante **InsForge CLI**, garantizando que el bundle final esté optimizado y las variables de entorno sean seguras.
 
+## 🌿 Flujo de Trabajo (Git Flow)
+
+Este proyecto utiliza el modelo de ramificación **Git Flow** para organizar el desarrollo y los lanzamientos a producción:
+
+- **`main`**: Contiene exclusivamente el código estable que está actualmente en producción.
+- **`develop`**: Es la rama de integración principal donde vive el código más reciente del desarrollo.
+- **`feature/`**: Ramas para el desarrollo de nuevas funcionalidades (nacen de `develop`).
+- **`bugfix/`** o **`hotfix/`**: Ramas para corrección de errores (nacen de `develop` o `main` respectivamente).
+
+### Guía Rápida de Comandos
+1. **Empezar una tarea**: `git checkout -b feature/nombre-tarea develop`
+2. **Finalizar una tarea**: 
+   - Abrir Pull Request hacia `develop`.
+   - Tras la aprobación, fusionar y borrar la rama local.
+3. **Lanzar a producción**: Fusionar `develop` hacia `main` (solo versiones estables y probadas).
+
 ---
 **Estimantra** · *Built for scaling engineering teams.*
