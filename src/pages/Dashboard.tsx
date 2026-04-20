@@ -79,16 +79,16 @@ export default function Dashboard() {
       loadDashboardData(); // Recargar datos al recibir notificación
     };
     
-    insforge.realtime.on('INSERT_project', handleProjectChange);
-    insforge.realtime.on('UPDATE_project', handleProjectChange);
-    insforge.realtime.on('DELETE_project', handleProjectChange);
+    insforge.realtime.on('INSERT_projects', handleProjectChange);
+    insforge.realtime.on('UPDATE_projects', handleProjectChange);
+    insforge.realtime.on('DELETE_projects', handleProjectChange);
     insforge.realtime.on('INSERT_organization_members', handleProjectChange);
     insforge.realtime.on('DELETE_organization_members', handleProjectChange);
 
     return () => {
-      insforge.realtime.off('INSERT_project', handleProjectChange);
-      insforge.realtime.off('UPDATE_project', handleProjectChange);
-      insforge.realtime.off('DELETE_project', handleProjectChange);
+      insforge.realtime.off('INSERT_projects', handleProjectChange);
+      insforge.realtime.off('UPDATE_projects', handleProjectChange);
+      insforge.realtime.off('DELETE_projects', handleProjectChange);
       insforge.realtime.off('INSERT_organization_members', handleProjectChange);
       insforge.realtime.off('DELETE_organization_members', handleProjectChange);
     };

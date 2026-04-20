@@ -51,10 +51,21 @@ export default function Profile() {
     setLoading(true);
     setMessage(null);
     try {
-      const { error: dbErr } = await insforge.auth.setProfile({ name });
+      // 1. Actualizar Metadatos de Auth
+      const { error: authErr } = await insforge.auth.setProfile({ name });
+      if (authErr) throw authErr;
+
+      // 2. Actualizar Tabla de Perfiles en Base de Datos (Columna full_name que usan los selectores)
+      const { error: dbErr } = await insforge.database
+        .from('profiles')
+        .update({ full_name: name })
+        .eq('id', user.id);
+
       if (dbErr) throw dbErr;
-      setMessage({ text: 'Perfil actualizado con éxito.', type: 'success' });
+
+      setMessage({ text: 'Perfil actualizado con éxito en todo el sistema.', type: 'success' });
     } catch (err: any) {
+      console.error('Error updating profile:', err);
       setMessage({ text: err.message || 'Error al actualizar perfil.', type: 'error' });
     } finally {
       setLoading(false);

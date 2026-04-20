@@ -121,6 +121,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setupRealtime();
 
     const refresh = () => loadOrganizations(user.id);
+    const refreshUser = async () => {
+      const { data } = await insforge.auth.getCurrentUser();
+      if (data?.user) setUser(data.user);
+    };
     
     // Escuchar eventos globales de membresía
     insforge.realtime.on('INSERT_organization_members', refresh);
@@ -129,6 +133,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // Escuchar si la organización misma cambia (ej: nombre editado)
     insforge.realtime.on('UPDATE_organizations', refresh);
     insforge.realtime.on('DELETE_organizations', refresh);
+    // Escuchar cambios en el perfil (nombre, avatar, etc)
+    insforge.realtime.on('UPDATE_profiles', refreshUser);
 
     return () => {
       insforge.realtime.off('INSERT_organization_members', refresh);
@@ -136,6 +142,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       insforge.realtime.off('UPDATE_organization_members', refresh);
       insforge.realtime.off('UPDATE_organizations', refresh);
       insforge.realtime.off('DELETE_organizations', refresh);
+      insforge.realtime.off('UPDATE_profiles', refreshUser);
     };
   }, [user, myOrganizations.length]);
 

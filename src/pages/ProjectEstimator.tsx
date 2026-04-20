@@ -87,14 +87,25 @@ export default function ProjectEstimator() {
     await insforge.realtime.subscribe(`project:${projectId}`);
     
     // Heartbeat de presencia (avisar que estoy editando)
-    const heartbeat = setInterval(() => {
+    const sendPresence = () => {
       insforge.realtime.publish(`project:${projectId}`, 'presence:editing', {
         name: user?.full_name || user?.email || 'Compañero'
       });
-    }, 5000);
+    };
+
+    // Aviso inmediato al entrar
+    sendPresence();
+
+    const heartbeat = setInterval(sendPresence, 2000);
 
     const handleDataChange = () => {
       loadWorkspace(); // Recargar datos al recibir notificación
+    };
+
+    const handleWhoIsHere = (payload: any) => {
+      if (payload.meta.senderId === user?.id) return;
+      // Si alguien pregunta quién está, y yo estoy aquí, respondo inmediatamente
+      sendPresence();
     };
     
     const handlePresence = (payload: any) => {
@@ -107,29 +118,36 @@ export default function ProjectEstimator() {
         if (lockTimeout) clearTimeout(lockTimeout);
         const timeout = setTimeout(() => {
            setEditorUser(null);
-        }, 12000);
+        }, 5000); // Expiración más rápida si no hay heartbeat
         setLockTimeout(timeout);
         return prev;
       });
     };
 
     insforge.realtime.on('presence:editing', handlePresence);
-    insforge.realtime.on('UPDATE_task', handleDataChange);
-    insforge.realtime.on('INSERT_task', handleDataChange);
-    insforge.realtime.on('DELETE_task', handleDataChange);
-    insforge.realtime.on('UPDATE_project_role', handleDataChange);
-    insforge.realtime.on('INSERT_project_role', handleDataChange);
-    insforge.realtime.on('DELETE_project_role', handleDataChange);
+    insforge.realtime.on('presence:who_is_here', handleWhoIsHere);
+
+    insforge.realtime.on('UPDATE_tasks', handleDataChange);
+    insforge.realtime.on('INSERT_tasks', handleDataChange);
+    insforge.realtime.on('DELETE_tasks', handleDataChange);
+    insforge.realtime.on('UPDATE_project_roles', handleDataChange);
+    insforge.realtime.on('INSERT_project_roles', handleDataChange);
+    insforge.realtime.on('DELETE_project_roles', handleDataChange);
+
+    // Preguntar quién está al entrar para bloqueo instantáneo
+    insforge.realtime.publish(`project:${projectId}`, 'presence:who_is_here', {});
 
     return () => {
       clearInterval(heartbeat);
       insforge.realtime.off('presence:editing', handlePresence);
-      insforge.realtime.off('UPDATE_task', handleDataChange);
-      insforge.realtime.off('INSERT_task', handleDataChange);
-      insforge.realtime.off('DELETE_task', handleDataChange);
-      insforge.realtime.off('UPDATE_project_role', handleDataChange);
-      insforge.realtime.off('INSERT_project_role', handleDataChange);
-      insforge.realtime.off('DELETE_project_role', handleDataChange);
+      insforge.realtime.off('presence:who_is_here', handleWhoIsHere);
+      insforge.realtime.off('UPDATE_tasks', handleDataChange);
+      insforge.realtime.off('INSERT_tasks', handleDataChange);
+      insforge.realtime.off('DELETE_tasks', handleDataChange);
+      insforge.realtime.off('UPDATE_project_roles', handleDataChange);
+      insforge.realtime.off('INSERT_project_roles', handleDataChange);
+      insforge.realtime.off('DELETE_project_roles', handleDataChange);
+      insforge.realtime.unsubscribe(`project:${projectId}`);
     };
   };
 
