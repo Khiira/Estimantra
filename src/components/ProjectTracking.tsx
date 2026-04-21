@@ -183,6 +183,8 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
     if (scrollRef.current) scrollRef.current.scrollLeft = scrollLeft - walk;
   };
 
+  const today = new Date().toISOString().split('T')[0];
+
   return (
     <div className={`tracking-wrapper ${isSidebarOpen ? '' : 'sidebar-collapsed'}`}>
       <div className="tracking-layout">
@@ -204,6 +206,7 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
               <input 
                 type="date" 
                 value={startDate} 
+                min={today}
                 onChange={(e) => {
                   setStartDate(e.target.value);
                   handleUpdateConfig({ start_date: e.target.value });
@@ -245,6 +248,7 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
                   type="date" 
                   className="premium-date-input"
                   value={newHoliday}
+                  min={today}
                   onChange={(e) => setNewHoliday(e.target.value)}
                   onClick={(e) => e.currentTarget.showPicker?.()}
                 />
