@@ -208,6 +208,7 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
                   setStartDate(e.target.value);
                   handleUpdateConfig({ start_date: e.target.value });
                 }}
+                onClick={(e) => e.currentTarget.showPicker?.()}
                 className="premium-date-input"
               />
             </div>
@@ -245,6 +246,7 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
                   className="premium-date-input"
                   value={newHoliday}
                   onChange={(e) => setNewHoliday(e.target.value)}
+                  onClick={(e) => e.currentTarget.showPicker?.()}
                 />
                 
                 <div className="hours-selector-v4">
