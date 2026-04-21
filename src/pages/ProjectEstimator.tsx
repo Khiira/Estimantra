@@ -179,17 +179,29 @@ export default function ProjectEstimator() {
     }
     setProject(projData); setRoles(roleData || []); setTasks(taskData || []); setOrgMembers(members); setLoading(false); setLoadingTasks(false);
      
-     // Si está aprobado, mostrar pestaña de seguimiento por defecto
-     if (projData?.status === 'aprobado' && activeTab === 'estimator') {
-       setActiveTab('tracking');
+     // Si está aprobado y no hemos seleccionado la versión aprobada aún, lo hacemos
+     if (projData?.status === 'aprobado') {
+       if (projData.approved_version && selectedVersion !== projData.approved_version) {
+         setSelectedVersion(projData.approved_version);
+       }
+       if (activeTab === 'estimator') {
+         setActiveTab('tracking');
+       }
      }
   };
 
   const handleStatusChange = async (newStatus: string) => {
     if (!projectId) return;
+    const updates: any = { status: newStatus };
+    
+    // Si se aprueba, guardamos qué versión estamos aprobando
+    if (newStatus === 'aprobado') {
+      updates.approved_version = selectedVersion;
+    }
+
     const { error } = await insforge.database
       .from('projects')
-      .update({ status: newStatus })
+      .update(updates)
       .eq('id', projectId);
     
     if (error) {
@@ -197,7 +209,7 @@ export default function ProjectEstimator() {
       return;
     }
     
-    setProject({ ...project, status: newStatus });
+    setProject({ ...project, ...updates });
     if (newStatus === 'aprobado') setActiveTab('tracking');
   };
 
