@@ -386,7 +386,7 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
         .add-holiday-btn-v4 { width: 44px; height: 44px; background: var(--color-accent-mint); color: var(--color-bg-primary); border: none; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
         .add-holiday-btn-v4.large { width: 50px; height: 50px; border-radius: 14px; box-shadow: 0 4px 15px rgba(72, 229, 194, 0.2); }
         .add-holiday-btn-v4:hover { transform: scale(1.05); filter: brightness(1.1); }
-        .hours-helper-text { font-size: 0.5rem; color: var(--color-text-secondary); opacity: 0.4; margin: 4px 0 0 4px; font-style: italic; }
+        .glass-card .hours-helper-text { font-size: 0.55rem; color: var(--color-text-secondary); opacity: 0.5; margin: 8px 0 0 4px; font-style: italic; display: block; }
         .unified-list-v4 { max-height: 250px; overflow-y: auto; }
         .holiday-row-v4 { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .h-left { display: flex; align-items: center; gap: 10px; min-width: 95px; }
