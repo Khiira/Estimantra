@@ -210,7 +210,13 @@ export default function ProjectEstimator() {
     }
     
     setProject({ ...project, ...updates });
-    if (newStatus === 'aprobado') setActiveTab('tracking');
+    
+    // Redirección inteligente de pestañas
+    if (newStatus === 'aprobado') {
+      setActiveTab('tracking');
+    } else {
+      setActiveTab('estimator');
+    }
   };
 
   const handleCreateNewVersion = async () => {
