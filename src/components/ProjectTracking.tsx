@@ -18,11 +18,30 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
   const [autoHolidays, setAutoHolidays] = useState<{date: string, name: string}[]>([]);
   const [newHoliday, setNewHoliday] = useState('');
   const [loadingHolidays, setLoadingHolidays] = useState(false);
-  const dayScrollRef = useRef<HTMLDivElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Refs para el scroll por arrastre
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  // Sincronizar estados locales con los datos del proyecto cuando cambian externamente
+  useEffect(() => {
+    if (project.start_date) setStartDate(project.start_date);
+    if (project.working_days) setWorkingDays(project.working_days);
+    if (project.holidays) setHolidays(project.holidays);
+    if (project.auto_holidays) setAutoHolidays(project.auto_holidays);
+  }, [project.id]);
 
   useEffect(() => {
-    fetchAutoHolidays();
-  }, []);
+    // Solo buscamos de la API si no hay feriados automáticos guardados
+    if (!project.auto_holidays || project.auto_holidays.length === 0) {
+      fetchAutoHolidays();
+    } else {
+      setAutoHolidays(project.auto_holidays);
+    }
+  }, [project.id]);
 
   const fetchAutoHolidays = async () => {
     setLoadingHolidays(true);
@@ -37,7 +56,10 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
         date: h.date,
         name: h.localName
       }));
+      
       setAutoHolidays(holidayData);
+      // Guardar en BD para persistencia del proyecto
+      handleUpdateConfig({ auto_holidays: holidayData });
     } catch (err) {
       console.error("Error cargando feriados:", err);
     } finally {
@@ -64,13 +86,19 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
   ];
 
   const handleUpdateConfig = async (updates: any) => {
+    setIsSaving(true);
     const { error } = await insforge.database
       .from('projects')
       .update(updates)
       .eq('id', project.id);
     
-    if (error) return;
-    onProjectUpdate({ ...project, ...updates });
+    if (error) {
+      console.error("Error al guardar:", error);
+    } else {
+      onProjectUpdate({ ...project, ...updates });
+    }
+    // Delay para feedback visual
+    setTimeout(() => setIsSaving(false), 800);
   };
 
   const toggleDay = (dayId: number) => {
@@ -97,23 +125,53 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
 
   const calculateEndDate = () => {
     if (!startDate || totalHours === 0) return null;
-    let current = parseISO(startDate);
+    
+    // Parsear la fecha asegurando que sea mediodía local para evitar desfases de zona horaria
+    const [year, month, day] = startDate.split('-').map(Number);
+    let current = new Date(year, month - 1, day, 12, 0, 0);
+    
     let remainingHours = totalHours;
     const hoursPerDay = project.hours_per_day || 8;
     const holidayDates = allHolidays.map(h => h.date);
 
     let iterations = 0;
-    while (remainingHours > 0 && iterations < 1000) {
+    // Máximo 2 años de iteración para evitar bucles infinitos
+    while (remainingHours > 0 && iterations < 730) {
       iterations++;
       const dayOfWeek = current.getDay();
       const dateStr = format(current, 'yyyy-MM-dd');
-      const isWorkingDay = workingDays.includes(dayOfWeek);
+      
+      // Aseguramos que comparamos números
+      const isWorkingDay = workingDays.map(Number).includes(dayOfWeek);
       const isHoliday = holidayDates.includes(dateStr);
 
-      if (isWorkingDay && !isHoliday) remainingHours -= hoursPerDay;
-      if (remainingHours > 0) current = addDays(current, 1);
+      if (isWorkingDay && !isHoliday) {
+        remainingHours -= hoursPerDay;
+      }
+      
+      if (remainingHours > 0) {
+        current = addDays(current, 1);
+      }
     }
     return current;
+  };
+
+  // Lógica de arrastre para el scroll
+  const onMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setStartX(e.pageX - (scrollRef.current?.offsetLeft || 0));
+    setScrollLeft(scrollRef.current?.scrollLeft || 0);
+  };
+
+  const onMouseLeave = () => setIsDragging(false);
+  const onMouseUp = () => setIsDragging(false);
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.pageX - (scrollRef.current?.offsetLeft || 0);
+    const walk = (x - startX) * 2; // Velocidad de scroll
+    if (scrollRef.current) scrollRef.current.scrollLeft = scrollLeft - walk;
   };
 
   const endDate = calculateEndDate();
@@ -125,7 +183,14 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
         {/* Lado Izquierdo: Configuración */}
         <div className="tracking-sidebar">
           <div className="glass-card tracking-config-panel">
-            <h3 className="section-title"><Calendar size={18} className="text-mint" /> Planificación</h3>
+            <div className="flex-between margin-bottom-20">
+              <h3 className="section-title" style={{marginBottom: 0}}><Calendar size={18} className="text-mint" /> Planificación</h3>
+              {isSaving ? (
+                <span className="saving-tag animate-pulse">Sincronizando...</span>
+              ) : (
+                <span className="saved-tag"><CheckCircle size={12} /> Guardado</span>
+              )}
+            </div>
             
             <div className="config-group">
               <label className="config-label">Fecha de Inicio</label>
@@ -141,14 +206,22 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
             </div>
 
             <div className="config-group">
-              <label className="config-label">Jornada Laboral</label>
-              <div className="day-scroll-container-v3" ref={dayScrollRef}>
-                <div className="day-flex-v3">
+              <label className="config-label">Jornada Laboral (Arrastra)</label>
+              <div 
+                className="day-scroll-v4" 
+                ref={scrollRef}
+                onMouseDown={onMouseDown}
+                onMouseLeave={onMouseLeave}
+                onMouseUp={onMouseUp}
+                onMouseMove={onMouseMove}
+                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+              >
+                <div className="day-flex-v4">
                   {daysOfWeek.map(day => (
                     <button 
                       key={day.id}
-                      className={`day-btn-v3 ${workingDays.includes(day.id) ? 'active' : ''}`}
-                      onClick={() => toggleDay(day.id)}
+                      className={`day-btn-v4 ${workingDays.includes(day.id) ? 'active' : ''}`}
+                      onClick={() => !isDragging && toggleDay(day.id)}
                     >
                       {day.name}
                     </button>
@@ -158,23 +231,23 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
             </div>
 
             <div className="config-group">
-              <label className="config-label">Feriados y No Laborables</label>
-              <div className="holiday-input-row-v3">
+              <label className="config-label">Feriados (API + Manual)</label>
+              <div className="holiday-input-row-v4">
                 <input 
                   type="date" 
                   className="premium-date-input compact"
                   value={newHoliday} 
                   onChange={(e) => setNewHoliday(e.target.value)}
                 />
-                <button className="add-holiday-btn-v3" onClick={addHoliday}>
+                <button className="add-holiday-btn-v4" onClick={addHoliday}>
                   <Plus size={20} />
                 </button>
               </div>
               
-              <div className="unified-list-v3 scroll-styled">
-                {loadingHolidays && <p className="loading-small">Cargando feriados...</p>}
+              <div className="unified-list-v4 scroll-styled">
+                {loadingHolidays && <p className="loading-small">Sincronizando feriados...</p>}
                 {allHolidays.map((h, i) => (
-                  <div key={i} className={`holiday-row-v3 ${h.isManual ? 'manual' : 'auto'}`}>
+                  <div key={i} className={`holiday-row-v4 ${h.isManual ? 'manual' : 'auto'}`}>
                     <div className="h-left">
                       {h.isManual ? <Info size={12} className="text-danger" /> : <ShieldCheck size={12} className="text-mint" />}
                       <span className="h-date">{format(parseISO(h.date), 'dd/MM/yy')}</span>
@@ -192,14 +265,14 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
 
         {/* Lado Derecho: Visualización y Dashboard */}
         <div className="tracking-main">
-          {/* Tarjeta de Fecha Estimada (DISEÑO ORIGINAL RECUPERADO) */}
+          {/* Tarjeta de Fecha Estimada */}
           <div className="glass-card original-hero-card">
             <div className="hero-header-flex">
               <TrendingUp size={20} className="text-mint" />
               <span className="hero-label">Entrega Estimada</span>
             </div>
             <h2 className="hero-date-large">
-              {endDate ? format(endDate, "d 'de' MMMM, yyyy", { locale: es }) : "Pendiente de configuración"}
+              {endDate ? format(endDate, "d 'de' MMMM, yyyy", { locale: es }) : "Define inicio"}
             </h2>
             <div className="hero-footer-flex">
               <div className="flex align-center gap-10">
@@ -208,7 +281,7 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
               </div>
               <div className="flex align-center gap-10">
                 <ShieldCheck size={14} className="text-mint" />
-                <span>Auto-Feriados Activos</span>
+                <span>{autoHolidays.length} Feriados Guardados</span>
               </div>
             </div>
           </div>
@@ -238,8 +311,8 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
           <div className="glass-card info-card-v3">
             <AlertCircle size={18} className="text-warning" />
             <div className="info-content">
-              <p><strong>Modo Planificación Activo</strong></p>
-              <p className="opacity-70">Próximamente podrás reportar horas reales por tarea para actualizar este tablero dinámicamente.</p>
+              <p><strong>Persistencia Activada</strong></p>
+              <p className="opacity-70">Los feriados detectados se han guardado en el proyecto. No se perderán aunque cierres la sesión o cambies de dispositivo.</p>
             </div>
           </div>
         </div>
@@ -247,7 +320,7 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
 
       <style>{`
         .tracking-wrapper { padding: 20px; }
-        .tracking-layout { display: grid; grid-template-columns: 320px 1fr; gap: 24px; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .tracking-layout { display: grid; grid-template-columns: 320px 1fr; gap: 24px; transition: all 0.4s ease; }
         .tracking-layout.sidebar-collapsed { grid-template-columns: 0px 1fr; }
         .tracking-layout.sidebar-collapsed .tracking-sidebar { opacity: 0; pointer-events: none; transform: translateX(-30px); }
 
@@ -259,38 +332,42 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
         
         .premium-date-input { width: 100%; background: rgba(0,0,0,0.2) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 12px !important; color: white !important; padding: 12px !important; outline: none; }
         
-        /* Jornada con Scroll Directo (Sin barra visible) */
-        .day-scroll-container-v3 { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; cursor: grab; padding: 5px 0; }
-        .day-scroll-container-v3::-webkit-scrollbar { display: none; }
-        .day-flex-v3 { display: flex; gap: 8px; min-width: max-content; }
-        .day-btn-v3 { 
-          width: 48px; height: 48px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; 
-          color: var(--color-text-secondary); font-weight: 700; cursor: pointer; transition: 0.2s;
+        /* Jornada con Arrastre (Drag) */
+        .day-scroll-v4 { 
+          overflow-x: auto; 
+          scrollbar-width: none; 
+          -ms-overflow-style: none; 
+          padding: 5px 0;
+          user-select: none;
+          white-space: nowrap;
         }
-        .day-btn-v3.active { background: var(--color-accent-mint); color: var(--color-bg-primary); border-color: var(--color-accent-mint); box-shadow: 0 4px 15px rgba(72, 229, 194, 0.3); }
+        .day-scroll-v4::-webkit-scrollbar { display: none; }
+        .day-flex-v4 { display: flex; gap: 10px; min-width: max-content; }
+        .day-btn-v4 { 
+          width: 54px; height: 54px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; 
+          color: var(--color-text-secondary); font-weight: 700; cursor: inherit; transition: 0.2s;
+        }
+        .day-btn-v4.active { background: var(--color-accent-mint); color: var(--color-bg-primary); border-color: var(--color-accent-mint); box-shadow: 0 4px 15px rgba(72, 229, 194, 0.3); }
 
         /* Feriados Layout */
-        .holiday-input-row-v3 { display: flex; gap: 8px; margin-bottom: 15px; }
-        .add-holiday-btn-v3 { 
+        .holiday-input-row-v4 { display: flex; gap: 8px; margin-bottom: 15px; }
+        .add-holiday-btn-v4 { 
           width: 44px; height: 44px; background: var(--color-accent-mint); color: var(--color-bg-primary); 
           border: none; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; 
         }
-        .unified-list-v3 { max-height: 250px; overflow-y: auto; }
-        .holiday-row-v3 { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .unified-list-v4 { max-height: 300px; overflow-y: auto; }
+        .holiday-row-v4 { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .h-left { display: flex; align-items: center; gap: 10px; min-width: 85px; }
         .h-date { font-size: 0.8rem; font-weight: 800; color: white; }
         .h-name { font-size: 0.8rem; color: var(--color-text-secondary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.6; }
         .h-del { background: transparent; border: none; color: #ef476f; cursor: pointer; opacity: 0.5; }
-        .h-del:hover { opacity: 1; }
 
-        /* DISEÑO ORIGINAL DE TARJETA HERO */
         .original-hero-card { margin-bottom: 24px; border: 1px solid rgba(72, 229, 194, 0.15); }
         .hero-header-flex { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
         .hero-label { font-size: 0.9rem; color: var(--color-text-secondary); letter-spacing: 0.5px; }
         .hero-date-large { font-size: 2.5rem; font-weight: 800; color: white; margin-bottom: 20px; }
         .hero-footer-flex { display: flex; gap: 24px; font-size: 0.85rem; color: var(--color-text-secondary); }
 
-        /* Stats y Grid */
         .tracking-grid-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
         .stat-card-v3 { padding: 20px; }
         .stat-title { font-size: 0.85rem; color: var(--color-text-secondary); }
@@ -314,6 +391,15 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
         .text-warning { color: #ffb800; }
         .scroll-styled::-webkit-scrollbar { width: 3px; }
         .scroll-styled::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+        .saving-tag { font-size: 0.65rem; color: #ffb800; background: rgba(255, 184, 0, 0.1); padding: 4px 8px; border-radius: 20px; font-weight: 700; }
+        .saved-tag { font-size: 0.65rem; color: var(--color-accent-mint); background: rgba(72, 229, 194, 0.1); padding: 4px 8px; border-radius: 20px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+        
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        .animate-pulse { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
       `}</style>
     </div>
   );

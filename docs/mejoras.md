@@ -1,38 +1,34 @@
-# Registro de Mejoras y Próximos Pasos
+# Hoja de Ruta: Mejoras de Estimantra
 
-> [!IMPORTANT]
-> **Estrategia de Desarrollo**: Todo el trabajo se realizará en la rama `feature/seguimiento-proyectos`. No se realizarán despliegues a producción (PRD) hasta que la funcionalidad esté perfeccionada y validada en entorno local.
+Este documento detalla las funcionalidades pendientes y en desarrollo para la plataforma de estimación y seguimiento.
 
-## Próximo Paso: Sistema de Gestión de Estados y Seguimiento Activo
-El objetivo es transformar la herramienta de una simple "calculadora de estimaciones" a un sistema de gestión de ciclo de vida de proyectos.
+## Próximos Pasos Prioritarios
 
-### 1. Gestión de Estados (Workflows)
-Se implementarán tres estados principales para cada estimación/proyecto:
-- **🟢 En Progreso**: El proyecto se está estimando. Todas las celdas y valores son editables.
-- **🟡 En Espera de Aprobación**: La estimación ha sido enviada al cliente.
-    - **Bloqueo**: Los datos se vuelven de "Solo Lectura" para evitar discrepancias entre lo enviado y lo almacenado.
-    - **Retorno**: Si el cliente pide cambios, debe volver manualmente a "En Progreso" para habilitar la edición (esto generará una nueva versión si es necesario).
-- **🔵 Aprobada**: El proyecto ha sido aceptado y pasa a la fase de **Seguimiento**.
+### 1. Gestión de Estados de Proyecto
+Un proyecto ahora puede transitar por tres estados:
+- **🟢 En Progreso**: Estado inicial donde se pueden añadir tareas, roles y modificar la estimación.
+- **🟡 En Espera**: Proyecto pausado o bloqueado. Se deshabilita la edición de tareas y roles.
+- **🔵 Aprobado**: El proyecto ha sido aceptado y pasa a la fase de **Seguimiento**.
 
-### 2. Interfaz de Gestión (Grilla de Proyectos)
-- Crear una **Grilla Principal** (similar a la de estimación) que permita ver todos los proyectos activos en su version aprobada,
-- Permitir la búsqueda y filtrado por estado o avance o fechas.
+### 2. Dashboard de Seguimiento (Completado)
+- [x] Implementar estados de proyecto (`En Progreso`, `En Espera`, `Aprobado`).
+- [x] Bloqueo de edición (`readOnly`) para proyectos en espera o aprobados.
+- [x] Interfaz de **Seguimiento de Proyecto** (Dashboard Premium).
+- [x] Calendario Inteligente:
+    - [x] Configuración de fecha de inicio.
+    - [x] Selección de jornada laboral (días hábiles).
+    - [x] Integración con API de Feriados (Chile) y feriados manuales.
+    - [x] Persistencia de feriados en la base de datos (Columna `auto_holidays`).
+    - [x] Cálculo automático de fecha de finalización (salto de feriados y fines de semana).
+- [x] Layout colapsable para maximizar espacio de trabajo.
+- [x] Scroll de jornada laboral por arrastre (Drag & Scroll).
 
-### 3. Seguimiento de Proyectos Aprobados
-Al pasar un proyecto al estado **Aprobado**, se habilitarán las siguientes funciones:
-- **Configuración de Tiempos**:
-    - Definición de **Fecha de Inicio**.
-    - **Calendario Inteligente**: Configuración de fines de semana y carga de feriados para cálculos de entrega realistas, considera la instalacion de librerias que ayuden a todo esto.
-- **Control de Avance**:
-    - Comparativa visual entre lo estimado vs. lo ejecutado.
-    - **Indicadores Visuales**: Barras de progreso por tarea y porcentaje de avance general del proyecto.
-    - Visualización del impacto del avance en el presupuesto final.
+### 3. Indicadores de Avance Real (Pendiente)
+- [ ] Marcado de tareas completadas en el `TaskTree`.
+- [ ] Actualización de barra de progreso en Seguimiento en base a tareas reales.
+- [ ] Comparativa visual entre lo estimado vs. lo ejecutado.
+- [ ] **Indicadores Visuales**: Barras de progreso por tarea y porcentaje de avance general del proyecto.
 
----
-
-### 📝 Plan de Acción Inmediato
-- [x] **Backend**: Campos de estado y seguimiento creados en la DB.
-- [x] **UI**: Selector de estado implementado en la cabecera.
-- [x] **Lógica**: Bloqueo de edición (readonly) funcional.
-- [x] **Seguimiento**: Componente `ProjectTracking` con API de feriados automatizada.
-- [ ] **Indicadores Visuales**: Implementar el marcado de tareas completadas para alimentar el avance %.
+### 4. Grilla de Proyectos (Pendiente)
+- Crear una **Grilla Principal** (similar a la de estimación) que permita ver todos los proyectos activos en su versión aprobada.
+- Permitir la búsqueda y filtrado por estado, avance o fechas.
