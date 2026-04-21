@@ -1346,10 +1346,9 @@ button:disabled {
 }
 
 .glass-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  transform: translateY(-10px);
+  background: rgba(255, 255, 255, 0.05);
   border-color: rgba(72, 229, 194, 0.4);
-  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
 
 .glass-icon-container {
@@ -1419,9 +1418,8 @@ button:disabled {
 }
 
 .project-tile:hover {
-  transform: translateY(-8px);
   border-color: rgba(72,229,194,0.4);
-  box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+  box-shadow: 0 15px 35px rgba(0,0,0,0.4);
   background: linear-gradient(145deg, rgba(28, 40, 75, 0.95), rgba(18, 28, 55, 0.98));
 }
 
