@@ -246,18 +246,25 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
               
               <div className="unified-list-v4 scroll-styled">
                 {loadingHolidays && <p className="loading-small">Sincronizando feriados...</p>}
-                {allHolidays.map((h, i) => (
-                  <div key={i} className={`holiday-row-v4 ${h.isManual ? 'manual' : 'auto'}`}>
-                    <div className="h-left">
-                      {h.isManual ? <Info size={12} className="text-danger" /> : <ShieldCheck size={12} className="text-mint" />}
-                      <span className="h-date">{format(parseISO(h.date), 'dd/MM/yy')}</span>
+                {allHolidays
+                  .filter(h => h.date >= format(new Date(), 'yyyy-MM-dd'))
+                  .map((h, i) => (
+                    <div key={i} className={`holiday-row-v4 ${h.isManual ? 'manual' : 'auto'}`}>
+                      <div className="h-left">
+                        {h.isManual ? <Info size={12} className="text-danger" /> : <ShieldCheck size={12} className="text-mint" />}
+                        <span className="h-date">{format(parseISO(h.date), 'dd/MM/yy')}</span>
+                      </div>
+                      <span className="h-name">{h.isManual ? 'Manual' : h.name}</span>
+                      {h.isManual && (
+                        <button onClick={() => removeHoliday(h.date)} className="h-del" title="Eliminar feriado">
+                          <Trash2 size={12} />
+                        </button>
+                      )}
                     </div>
-                    <span className="h-name">{h.isManual ? 'Manual' : h.name}</span>
-                    {h.isManual && (
-                      <button onClick={() => removeHoliday(h.date)} className="h-del"><Trash2 size={12} /></button>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                {allHolidays.filter(h => h.date >= format(new Date(), 'yyyy-MM-dd')).length === 0 && (
+                  <div className="empty-holidays" style={{textAlign: 'center', padding: '20px', opacity: 0.5, fontSize: '0.8rem'}}>No hay feriados próximos</div>
+                )}
               </div>
             </div>
           </div>
