@@ -653,7 +653,7 @@ export default function Dashboard() {
                       </div>
 
                       <div className={`tile-status-badge ${p.status || 'en_progreso'}`}>
-                        {p.status === 'en_espera' ? 'En Espera' : p.status === 'aprobado' ? 'Aprobado' : 'En Progreso'}
+                        {p.status === 'en_espera' ? 'En Espera' : p.status === 'aprobado' ? `Aprobado (${p.approved_version || 'v1.0'})` : 'En Progreso'}
                       </div>
 
                       <div className="tile-footer">
