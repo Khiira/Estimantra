@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { insforge } from '../lib/insforge';
-import LogoutWarningModal from '../components/LogoutWarningModal';
 
 type SessionContextType = {
   user: any;
@@ -20,44 +19,26 @@ const SessionContext = createContext<SessionContextType>({
   loadOrganizations: async () => {} 
 });
 
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutos
-const WARNING_BEFORE = 1 * 60 * 1000; // 1 minuto antes
-
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeOrganization, setActiveOrganization] = useState<any>(null);
   const [myOrganizations, setMyOrganizations] = useState<any[]>([]);
-  
-  // Estados para gestión de inactividad
-  const [showWarning, setShowWarning] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(60);
-  const lastActivityRef = useRef<number>(Date.now());
-  const timerIntervalRef = useRef<number | null>(null);
 
   const handleLogout = async () => {
     try {
       await insforge.auth.signOut();
       setUser(null);
-      // Limpiar rastros locales
       localStorage.removeItem('insforge_auth_token');
       localStorage.removeItem('insforge.auth.token');
-      localStorage.removeItem('estimantra_remember_me'); // Limpiar preferencia al cerrar sesión manual
       window.location.href = '/login';
     } catch (err) {
-      console.error('Error during automatic logout:', err);
+      console.error('Error during logout:', err);
       window.location.href = '/login';
     }
   };
 
-  const resetActivity = () => {
-    lastActivityRef.current = Date.now();
-    if (showWarning) {
-      setShowWarning(false);
-    }
-  };
-
-    const loadOrganizations = async (userId?: string, retryCount = 0) => {
+  const loadOrganizations = async (userId?: string, retryCount = 0) => {
     const targetUserId = userId || user?.id;
     if (!targetUserId) return;
 
@@ -70,7 +51,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           
       if (error) {
         if (((error as any).status === 401 || (error as any).code === '42501') && retryCount < 1) {
-          console.warn('Reintentando carga de organizaciones por error de permisos (401)...');
           await new Promise(resolve => setTimeout(resolve, 800));
           return loadOrganizations(targetUserId, retryCount + 1);
         }
@@ -96,71 +76,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('Error loading organizations:', err);
-      if (retryCount >= 1) setMyOrganizations([]);
       if ((err as any).status === 401 || (err as any).code === 'PGRST301') {
         handleLogout();
       }
     }
   };
 
-  // Monitoreo de actividad (Detección de cuando mostrar advertencia)
+  // Cargar usuario inicial y validar token
   useEffect(() => {
-    const isRemembered = localStorage.getItem('estimantra_remember_me') === 'true';
-    
-    // Si no hay usuario o si eligió ser recordado, no activamos el cierre por inactividad
-    if (!user || isRemembered) {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-      return;
-    }
-
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    const handleUserInteraction = () => resetActivity();
-    
-    events.forEach(event => document.addEventListener(event, handleUserInteraction));
-
-    timerIntervalRef.current = window.setInterval(() => {
-      const now = Date.now();
-      const diff = now - lastActivityRef.current;
-
-      if (diff >= INACTIVITY_TIMEOUT - WARNING_BEFORE && !showWarning) {
-        setShowWarning(true);
-        setSecondsLeft(60);
-      }
-    }, 5000);
-
-    return () => {
-      events.forEach(event => document.removeEventListener(event, handleUserInteraction));
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    };
-  }, [user, showWarning]);
-
-  // Contador regresivo (Solo cuando la advertencia está visible)
-  useEffect(() => {
-    if (!showWarning) return;
-
-    const countdownInterval = window.setInterval(() => {
-      setSecondsLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownInterval);
-          handleLogout();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(countdownInterval);
-  }, [showWarning]);
-
-  // Cargar usuario inicial
-  useEffect(() => {
-
     let isMounted = true;
     
-    // Solo intentar recuperar la sesión si hay un rastro local de que el usuario estuvo logueado.
     const hasSessionTrace = !!localStorage.getItem('insforge_auth_token') || 
                            !!localStorage.getItem('insforge.auth.token') ||
                            document.cookie.includes('insforge');
@@ -170,9 +95,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    insforge.auth.getCurrentUser().then(async ({ data }) => {
+    insforge.auth.getCurrentUser().then(async ({ data, error }) => {
       if (!isMounted) return;
       
+      if (error && (error as any).status === 401) {
+        handleLogout();
+        return;
+      }
+
       const authUser = data?.user ?? null;
       setUser(authUser);
       
@@ -180,9 +110,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         await loadOrganizations(authUser.id);
       }
       setLoading(false);
-    }).catch(async (err) => {
+    }).catch(() => {
       if (!isMounted) return;
-      console.error('Fallo en la comunicación inicial con el servicio de autenticación:', err);
       setUser(null);
       setLoading(false);
     });
@@ -190,7 +119,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return () => { isMounted = false; };
   }, []);
 
-  // Realtime y eventos de base de datos
+  // Realtime y verificación periódica del Token
   useEffect(() => {
     if (!user) return;
 
@@ -224,13 +153,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     insforge.realtime.on('DELETE_organizations', refresh);
     insforge.realtime.on('UPDATE_profiles', refreshUser);
 
-    // Verificación periódica del token (cada 5 minutos) para seguridad extra "según el token"
+    // Verificación de salud del Token cada 15 minutos
     const tokenCheckInterval = setInterval(async () => {
       const { error } = await insforge.auth.getCurrentUser();
       if (error && (error as any).status === 401) {
         handleLogout();
       }
-    }, 5 * 60 * 1000);
+    }, 15 * 60 * 1000);
 
     return () => {
       insforge.realtime.off('INSERT_organization_members', refresh);
@@ -246,16 +175,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   return (
     <SessionContext.Provider value={{ user, loading, activeOrganization, setActiveOrganization, myOrganizations, loadOrganizations }}>
       {children}
-      {showWarning && (
-        <LogoutWarningModal 
-          secondsLeft={secondsLeft} 
-          onStay={resetActivity} 
-          onLogout={handleLogout} 
-        />
-      )}
     </SessionContext.Provider>
   );
 }
 
 export const useSession = () => useContext(SessionContext);
-
