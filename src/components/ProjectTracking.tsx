@@ -191,7 +191,7 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
           <div className="glass-card config-panel-v4">
             <div className="section-title">
               <Calendar size={18} />
-              <span>Configuración Plan</span>
+              <span>Planificación</span>
               {isSaving ? (
                 <span className="saving-tag animate-pulse">Sincronizando...</span>
               ) : (
@@ -357,8 +357,8 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
       <style>{`
         .tracking-wrapper { padding: 20px; }
         .tracking-layout { display: grid; grid-template-columns: 320px 1fr; gap: 24px; transition: all 0.4s ease; }
-        .tracking-layout.sidebar-collapsed { grid-template-columns: 0px 1fr; }
-        .tracking-layout.sidebar-collapsed .tracking-sidebar { opacity: 0; pointer-events: none; transform: translateX(-30px); }
+        .sidebar-collapsed .tracking-layout { grid-template-columns: 0px 1fr; gap: 0; }
+        .sidebar-collapsed .tracking-sidebar { opacity: 0; pointer-events: none; transform: translateX(-30px); width: 0; overflow: hidden; padding: 0; border: none; }
 
         .tracking-sidebar { width: 320px; transition: all 0.4s ease; }
         .glass-card { background: rgba(28, 37, 65, 0.4); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 24px; }
