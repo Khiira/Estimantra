@@ -240,28 +240,30 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
             <div className="config-group">
               <label className="config-label">Feriados y Excepciones</label>
               <div className="holiday-input-stack-v4">
-                <div className="holiday-input-row-v4">
-                  <input 
-                    type="date" 
-                    className="premium-date-input flex-1"
-                    value={newHoliday}
-                    onChange={(e) => setNewHoliday(e.target.value)}
-                  />
-                </div>
-                <div className="holiday-input-row-v4" style={{ marginTop: '8px' }}>
-                  <select 
-                    className="premium-date-input flex-1"
-                    value={newHolidayHours}
-                    onChange={(e) => setNewHolidayHours(e.target.value)}
-                    style={{ fontSize: '0.8rem' }}
-                  >
-                    <option value="0">Feriado Total (0h)</option>
-                    <option value="4">Media Jornada (4h)</option>
-                    <option value="2">2 Horas</option>
-                    <option value="6">6 Horas</option>
-                  </select>
-                  <button className="add-holiday-btn-v4" onClick={addHoliday}>
-                    <Plus size={20} />
+                <input 
+                  type="date" 
+                  className="premium-date-input"
+                  value={newHoliday}
+                  onChange={(e) => setNewHoliday(e.target.value)}
+                />
+                
+                <div className="hours-selector-v4">
+                  {[
+                    { label: 'Total', val: '0' },
+                    { label: '2h', val: '2' },
+                    { label: '4h', val: '4' },
+                    { label: '6h', val: '6' }
+                  ].map(chip => (
+                    <button
+                      key={chip.val}
+                      className={`hour-chip-v4 ${newHolidayHours === chip.val ? 'active' : ''}`}
+                      onClick={() => setNewHolidayHours(chip.val)}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                  <button className="add-holiday-btn-v4 large" onClick={addHoliday}>
+                    <Plus size={24} strokeWidth={3} />
                   </button>
                 </div>
               </div>
@@ -371,8 +373,18 @@ export default function ProjectTracking({ project, tasks, onProjectUpdate, isSid
         .day-btn-v4 { width: 54px; height: 54px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; color: var(--color-text-secondary); font-weight: 700; cursor: inherit; transition: 0.2s; }
         .day-btn-v4.active { background: var(--color-accent-mint); color: var(--color-bg-primary); border-color: var(--color-accent-mint); box-shadow: 0 4px 15px rgba(72, 229, 194, 0.3); }
 
-        .holiday-input-row-v4 { display: flex; gap: 8px; }
-        .add-holiday-btn-v4 { width: 44px; height: 44px; background: var(--color-accent-mint); color: var(--color-bg-primary); border: none; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .holiday-input-stack-v4 { display: flex; flex-direction: column; gap: 12px; }
+        .hours-selector-v4 { display: flex; gap: 8px; align-items: center; }
+        .hour-chip-v4 { 
+          flex: 1; padding: 10px 0; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
+          border-radius: 10px; color: var(--color-text-secondary); font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: 0.2s;
+        }
+        .hour-chip-v4:hover { background: rgba(255,255,255,0.08); }
+        .hour-chip-v4.active { background: rgba(72, 229, 194, 0.15); border-color: var(--color-accent-mint); color: var(--color-accent-mint); }
+
+        .add-holiday-btn-v4 { width: 44px; height: 44px; background: var(--color-accent-mint); color: var(--color-bg-primary); border: none; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
+        .add-holiday-btn-v4.large { width: 50px; height: 50px; border-radius: 14px; box-shadow: 0 4px 15px rgba(72, 229, 194, 0.2); }
+        .add-holiday-btn-v4:hover { transform: scale(1.05); filter: brightness(1.1); }
         .unified-list-v4 { max-height: 250px; overflow-y: auto; }
         .holiday-row-v4 { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .h-left { display: flex; align-items: center; gap: 10px; min-width: 95px; }
