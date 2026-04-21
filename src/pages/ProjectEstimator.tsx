@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useRoute } from 'wouter';
 import { insforge } from '../lib/insforge';
-import { ArrowLeft, Plus, Check, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ArrowLeft, Plus, Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Calendar, Activity, Lock } from 'lucide-react';
 import { Link } from 'wouter';
+import { format, addBusinessDays, isWithinInterval, parseISO } from 'date-fns';
 import TaskTree from '../components/TaskTree';
 import ProposalBuilder from '../components/ProposalBuilder';
+import ProjectTracking from '../components/ProjectTracking';
 import { useSession } from '../auth/SessionContext';
 
 // Tipo de versión mejorada
@@ -31,7 +33,8 @@ export default function ProjectEstimator() {
   const [isVersioning, setIsVersioning] = useState(false);
   const [grandTotals, setGrandTotals] = useState({ hours: 0, cost: 0 });
   
-  const [activeTab, setActiveTab] = useState<'estimator' | 'proposal'>('estimator');
+  const [activeTab, setActiveTab] = useState<'estimator' | 'proposal' | 'tracking'>('estimator');
+  const [isTrackingSidebarOpen, setIsTrackingSidebarOpen] = useState(true);
   
   // Real-time & Locking
   const [editorUser, setEditorUser] = useState<{ id: string, name: string } | null>(null);
@@ -175,6 +178,27 @@ export default function ProjectEstimator() {
        }
     }
     setProject(projData); setRoles(roleData || []); setTasks(taskData || []); setOrgMembers(members); setLoading(false); setLoadingTasks(false);
+     
+     // Si está aprobado, mostrar pestaña de seguimiento por defecto
+     if (projData?.status === 'aprobado' && activeTab === 'estimator') {
+       setActiveTab('tracking');
+     }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!projectId) return;
+    const { error } = await insforge.database
+      .from('projects')
+      .update({ status: newStatus })
+      .eq('id', projectId);
+    
+    if (error) {
+      alert(`Error al cambiar estado: ${error.message}`);
+      return;
+    }
+    
+    setProject({ ...project, status: newStatus });
+    if (newStatus === 'aprobado') setActiveTab('tracking');
   };
 
   const handleCreateNewVersion = async () => {
@@ -294,12 +318,25 @@ export default function ProjectEstimator() {
             </div>
 
             <div className="version-selector-container">
+               <div className="status-selector">
+                 <select 
+                   className={`status-pill ${project.status || 'en_progreso'}`}
+                   value={project.status || 'en_progreso'}
+                   onChange={(e) => handleStatusChange(e.target.value)}
+                   title="Cambiar estado del proyecto"
+                 >
+                   <option value="en_progreso">🟢 En Progreso</option>
+                   <option value="en_espera">🟡 En Espera (Bloqueado)</option>
+                   <option value="aprobado">🔵 Aprobado (Seguimiento)</option>
+                 </select>
+               </div>
+
                <div className="select-wrapper">
                  <select 
                    className="version-select"
                    value={selectedVersion}
                    onChange={(e) => setSelectedVersion(e.target.value)}
-                   disabled={isVersioning || loadingTasks || !!editorUser}
+                   disabled={isVersioning || loadingTasks || !!editorUser || project.status !== 'en_progreso'}
                    title="Seleccionar versión"
                  >
                    {allVersions.map(v => (
@@ -313,7 +350,7 @@ export default function ProjectEstimator() {
                <button 
                  className="accent-btn version-btn-small" 
                  onClick={handleCreateNewVersion}
-                 disabled={isVersioning || !!editorUser}
+                 disabled={isVersioning || !!editorUser || project.status !== 'en_progreso'}
                  title="Crear nueva versión con nombre"
                >
                  {isVersioning ? '...' : '+ Versión'}
@@ -346,7 +383,13 @@ export default function ProjectEstimator() {
           <div className="flex gap-10">
             <button className={`tab-btn ${activeTab === 'estimator' ? 'active' : ''}`} onClick={() => setActiveTab('estimator')}>Estimación</button>
             <button className={`tab-btn ${activeTab === 'proposal' ? 'active' : ''}`} onClick={() => setActiveTab('proposal')}>Resumen</button>
+            {project.status === 'aprobado' && (
+              <button className={`tab-btn ${activeTab === 'tracking' ? 'active' : ''}`} onClick={() => setActiveTab('tracking')}>
+                <Activity size={14} className="margin-right-5" /> Seguimiento
+              </button>
+            )}
           </div>
+          
           {activeTab === 'estimator' && (
             <button 
               className="icon-btn text-button toggle-roles-btn" 
@@ -354,6 +397,16 @@ export default function ProjectEstimator() {
               title={showRoles ? "Ocultar Perfiles" : "Mostrar Perfiles"}
             >
               {showRoles ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+            </button>
+          )}
+
+          {activeTab === 'tracking' && (
+            <button 
+              className="icon-btn text-button toggle-roles-btn" 
+              onClick={() => setIsTrackingSidebarOpen(!isTrackingSidebarOpen)}
+              title={isTrackingSidebarOpen ? "Ocultar Planificación" : "Mostrar Planificación"}
+            >
+              {isTrackingSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
             </button>
           )}
       </div>
@@ -417,12 +470,28 @@ export default function ProjectEstimator() {
                 {[...Array(5)].map((_, i) => <div key={i} className="task-skeleton-row skeleton" style={{ animationDelay: `${i * 0.07}s`, width: `${100 - i * 6}%` }} />)}
               </div>
             ) : (
-              <TaskTree tasks={tasks} roles={roles} projectId={projectId} version={selectedVersion} onTasksChange={setTasks} readOnly={!!editorUser} />
+              <TaskTree 
+                tasks={tasks} 
+                roles={roles} 
+                projectId={projectId} 
+                version={selectedVersion} 
+                onTasksChange={setTasks} 
+                readOnly={!!editorUser || project.status !== 'en_progreso'} 
+              />
             )}
           </div>
         </main>
       </div>
-      ) : <div className="proposal-view-container"><ProposalBuilder project={project} tasks={tasks} grandTotals={grandTotals} /></div>}
+       ) : activeTab === 'proposal' ? (
+         <div className="proposal-view-container"><ProposalBuilder project={project} tasks={tasks} grandTotals={grandTotals} /></div>
+       ) : (
+         <ProjectTracking 
+           project={project} 
+           tasks={tasks} 
+           onProjectUpdate={(updated) => setProject(updated)} 
+           isSidebarOpen={isTrackingSidebarOpen}
+         />
+       )}
     </div>
   );
 }

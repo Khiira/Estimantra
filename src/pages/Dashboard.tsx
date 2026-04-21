@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSession } from '../auth/SessionContext';
 import { insforge } from '../lib/insforge';
 import { Link, useLocation } from 'wouter';
@@ -25,6 +25,7 @@ export default function Dashboard() {
   // Filtros y Búsqueda
   const [filterClient, setFilterClient] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
 
   // Obtener categorías únicas dinámicamente
@@ -260,6 +261,7 @@ export default function Dashboard() {
     let result = [...projects];
     if (filterClient !== 'all') result = result.filter(p => p.client_id === filterClient);
     if (filterCategory !== 'all') result = result.filter(p => p.category === filterCategory);
+    if (filterStatus !== 'all') result = result.filter(p => p.status === filterStatus);
     
     result.sort((a, b) => {
       const dateA = new Date(a.updated_at).getTime();
@@ -267,7 +269,7 @@ export default function Dashboard() {
       return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
     });
     return result;
-  }, [projects, filterClient, filterCategory, sortBy]);
+  }, [projects, filterClient, filterCategory, filterStatus, sortBy]);
 
   // Lógica de Unión por Código
   const [joinCode, setJoinCode] = useState('');
@@ -440,6 +442,34 @@ export default function Dashboard() {
                 opacity: 0.9;
                 filter: brightness(0.9);
               }
+
+              /* Status Badges */
+              .tile-status-badge {
+                position: absolute;
+                top: 28px;
+                right: 65px;
+                font-size: 0.65rem;
+                font-weight: 800;
+                padding: 4px 10px;
+                border-radius: 6px;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+              }
+              .tile-status-badge.en_progreso {
+                background: rgba(72, 229, 194, 0.1);
+                color: var(--color-accent-mint);
+                border: 1px solid rgba(72, 229, 194, 0.2);
+              }
+              .tile-status-badge.en_espera {
+                background: rgba(255, 184, 0, 0.1);
+                color: #ffb800;
+                border: 1px solid rgba(255, 184, 0, 0.2);
+              }
+              .tile-status-badge.aprobado {
+                background: rgba(0, 194, 255, 0.1);
+                color: #00c2ff;
+                border: 1px solid rgba(0, 194, 255, 0.2);
+              }
             `}</style>
           </div>
         )}
@@ -541,6 +571,20 @@ export default function Dashboard() {
 
         <div className="filters-group">
           <select 
+            value={filterStatus} 
+            onChange={e => setFilterStatus(e.target.value)}
+            className="select-pill"
+            title="Filtrar por estado"
+          >
+            <option value="all">Estados (Todos)</option>
+            <option value="en_progreso">🟢 En Progreso</option>
+            <option value="en_espera">🟡 En Espera</option>
+            <option value="aprobado">🔵 Aprobados</option>
+          </select>
+        </div>
+
+        <div className="filters-group">
+          <select 
             value={sortBy} 
             onChange={e => setSortBy(e.target.value as 'newest' | 'oldest')}
             className="select-pill"
@@ -606,6 +650,10 @@ export default function Dashboard() {
                       
                       <div className="tile-client">
                         <Building size={14} /> {p.clients?.name || 'Cliente Particular'}
+                      </div>
+
+                      <div className={`tile-status-badge ${p.status || 'en_progreso'}`}>
+                        {p.status === 'en_espera' ? 'En Espera' : p.status === 'aprobado' ? 'Aprobado' : 'En Progreso'}
                       </div>
 
                       <div className="tile-footer">
