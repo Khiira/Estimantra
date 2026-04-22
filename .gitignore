@@ -13,6 +13,7 @@ out_deploy*
 deploy_temp
 dist-ssr
 *.local
+test-users.local.md
 
 # Editor directories and files
 .vscode/*
