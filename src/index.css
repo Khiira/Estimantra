@@ -2003,3 +2003,66 @@ button:disabled {
   color: var(--color-text-secondary);
   opacity: 0.7;
 }
+/* ── Team Management Styles ── */
+.team-select-mini {
+  padding: 2px 8px !important;
+  height: 28px !important;
+  min-width: 40px !important;
+  font-size: 0.8rem !important;
+  background-position: right 8px center !important;
+}
+
+.team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.team-item-v2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  transition: all 0.2s ease;
+}
+
+.team-item-v2:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-accent-mint);
+}
+
+.team-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.team-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.team-role-select {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  font-size: 0.75rem !important;
+  color: var(--color-accent-mint) !important;
+  height: auto !important;
+  min-width: auto !important;
+  cursor: pointer !important;
+  background-image: none !important;
+}
+
+.team-role-select:focus {
+  box-shadow: none !important;
+}
+
+.margin-top-30 { margin-top: 30px; }
+.margin-right-5 { margin-right: 5px; }

@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useRoute } from 'wouter';
 import { insforge } from '../lib/insforge';
-import { ArrowLeft, Plus, Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Calendar, Activity, Lock } from 'lucide-react';
+import { ArrowLeft, Plus, Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Activity, Trash2 } from 'lucide-react';
 import { Link } from 'wouter';
-import { format, addBusinessDays, isWithinInterval, parseISO } from 'date-fns';
 import TaskTree from '../components/TaskTree';
 import ProposalBuilder from '../components/ProposalBuilder';
 import ProjectTracking from '../components/ProjectTracking';
@@ -44,6 +43,7 @@ export default function ProjectEstimator() {
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleCost, setNewRoleCost] = useState('');
   const [orgMembers, setOrgMembers] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [showRoles, setShowRoles] = useState(true);
 
@@ -61,6 +61,31 @@ export default function ProjectEstimator() {
     if (error) { alert(`Error al crear rol: ${error.message}`); return; }
     if (data) setRoles([...roles, data[0]]);
     setShowRoleForm(false); setNewRoleName(''); setNewRoleCost(''); setSelectedMemberId('');
+  };
+
+  const handleAddTeamMember = async (profile: any) => {
+    if (!profile) return;
+    const { data, error } = await insforge.database
+      .from('team_members')
+      .insert([{ project_id: projectId, name: profile.full_name, email: profile.email }])
+      .select();
+    if (error) { alert(`Error: ${error.message}`); return; }
+    if (data) setTeamMembers([...teamMembers, data[0]]);
+  };
+
+  const handleDeleteTeamMember = async (id: string) => {
+    const { error } = await insforge.database.from('team_members').delete().eq('id', id);
+    if (error) alert(`Error: ${error.message}`);
+    else setTeamMembers(teamMembers.filter(m => m.id !== id));
+  };
+
+  const handleUpdateMemberRole = async (memberId: string, roleId: string) => {
+    const { error } = await insforge.database
+      .from('team_members')
+      .update({ role_id: roleId === '' ? null : roleId })
+      .eq('id', memberId);
+    if (error) alert(`Error: ${error.message}`);
+    else setTeamMembers(teamMembers.map(m => m.id === memberId ? { ...m, role_id: roleId === '' ? null : roleId } : m));
   };
 
   useEffect(() => {
@@ -104,6 +129,9 @@ export default function ProjectEstimator() {
     insforge.realtime.on('UPDATE_project_roles', handleDataChange);
     insforge.realtime.on('INSERT_project_roles', handleDataChange);
     insforge.realtime.on('DELETE_project_roles', handleDataChange);
+    insforge.realtime.on('UPDATE_team_members', handleDataChange);
+    insforge.realtime.on('INSERT_team_members', handleDataChange);
+    insforge.realtime.on('DELETE_team_members', handleDataChange);
     insforge.realtime.publish(`project:${projectId}`, 'presence:who_is_here', {});
     return () => {
       clearInterval(heartbeat);
@@ -177,7 +205,17 @@ export default function ProjectEstimator() {
            members = pData || [];
        }
     }
-    setProject(projData); setRoles(roleData || []); setTasks(taskData || []); setOrgMembers(members); setLoading(false); setLoadingTasks(false);
+
+    // 5. Team Members
+    const { data: teamData } = await insforge.database.from('team_members').select('*').eq('project_id', projectId);
+
+    setProject(projData); 
+    setRoles(roleData || []); 
+    setTasks(taskData || []); 
+    setOrgMembers(members); 
+    setTeamMembers(teamData || []);
+    setLoading(false); 
+    setLoadingTasks(false);
      
      // Si está aprobado y no hemos seleccionado la versión aprobada aún, lo hacemos
      if (projData?.status === 'aprobado') {
@@ -470,10 +508,78 @@ export default function ProjectEstimator() {
           <div className="roles-list">
             {roles.length === 0 && !showRoleForm ? <p className="empty-msg">No hay perfiles.</p> : (
               roles.map(r => (
-                <div key={r.id} className="role-item">
+                <div key={r.id} className="role-item group/role relative overflow-hidden">
                   <span className="color-dot" style={{background: r.color_hex || 'var(--color-accent-mint)'}}></span>
-                  <span>{r.name}</span>
-                  <span className="cost">{r.hourly_rate} UF/h</span>
+                  <div className="role-info flex-1 pr-6">
+                    <span className="role-name block truncate" title={r.name}>{r.name}</span>
+                    <span className="cost block mt-1">{r.hourly_rate} UF/h</span>
+                  </div>
+                  <button 
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm(`¿Eliminar perfil "${r.name}"?`)) {
+                        const { error } = await insforge.database.from('project_roles').delete().eq('id', r.id);
+                        if (error) {
+                          alert(`No se pudo eliminar el perfil. Error: ${error.message || JSON.stringify(error)}`);
+                          console.error("Error borrando rol:", error);
+                        } else {
+                          loadWorkspace();
+                        }
+                      }
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/role:opacity-100 transition-opacity flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded p-1.5"
+                    title="Eliminar perfil"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="panel-header margin-top-30">
+            <h3>Equipo del Proyecto</h3>
+            {!editorUser && (
+              <div className="team-add-dropdown">
+                <select 
+                  className="icon-btn text-button team-select-mini"
+                  onChange={(e) => {
+                    const member = orgMembers.find(m => m.id === e.target.value);
+                    if (member) handleAddTeamMember(member);
+                    e.target.value = '';
+                  }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>+</option>
+                  {orgMembers
+                    .filter(om => !teamMembers.some(tm => tm.email === om.email))
+                    .map(om => (
+                    <option key={om.id} value={om.id}>{om.full_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          <div className="team-list">
+            {teamMembers.length === 0 ? <p className="empty-msg">No hay miembros.</p> : (
+              teamMembers.map(m => (
+                <div key={m.id} className="team-item-v2">
+                  <div className="team-info">
+                    <span className="team-name">{m.name}</span>
+                    <select 
+                      className="team-role-select"
+                      value={m.role_id || ''}
+                      onChange={(e) => handleUpdateMemberRole(m.id, e.target.value)}
+                    >
+                      <option value="">Sin Rol</option>
+                      {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                  </div>
+                  {!editorUser && (
+                    <button className="icon-btn tiny danger" onClick={() => handleDeleteTeamMember(m.id)}>
+                      <Trash2 size={12} />
+                    </button>
+                  )}
                 </div>
               ))
             )}
@@ -506,6 +612,7 @@ export default function ProjectEstimator() {
          <ProjectTracking 
            project={project} 
            tasks={tasks} 
+           roles={roles}
            onProjectUpdate={(updated) => setProject(updated)} 
            isSidebarOpen={isTrackingSidebarOpen}
          />

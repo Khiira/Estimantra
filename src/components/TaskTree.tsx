@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { insforge } from '../lib/insforge';
-import { ChevronRight, ChevronDown, Plus, Trash2, Clock, AlignLeft, DollarSign } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Trash2, Clock, AlignLeft, DollarSign, Link as LinkIcon } from 'lucide-react';
 
 export default function TaskTree({ tasks, roles, projectId, version, onTasksChange, onTotalsChange, readOnly }: any) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -162,6 +162,20 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
     onTasksChange(tasks.filter((t: any) => !idSetToRemove.has(t.id)));
   };
 
+  const getValidPredecessors = (currentId: string) => {
+    // Evitar circularidad básica: no puede ser ella misma ni sus descendientes
+    const descendants = new Set<string>();
+    const collect = (id: string) => {
+      tasks.filter((t: any) => t.parent_id === id).forEach((c: any) => {
+        descendants.add(c.id);
+        collect(c.id);
+      });
+    };
+    collect(currentId);
+    
+    return tasks.filter((t: any) => t.id !== currentId && !descendants.has(t.id));
+  };
+
   // 2. Renderizado Recursivo
   const renderTaskNode = (node: any, depth = 0) => {
     const isExpanded = expanded[node.id];
@@ -218,6 +232,22 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
                   </select>
                   <ChevronDown size={12} className="role-select-icon" />
                 </div>
+                <div className="predecessor-select-wrapper">
+                  <select 
+                    className="role-select predecessor-select" 
+                    disabled={readOnly}
+                    value={node.predecessor_id || ''} 
+                    onChange={e => handleUpdateTask(node.id, 'predecessor_id', e.target.value || null)}
+                    title="Tarea previa (Dependencia)"
+                  >
+                    <option value="">Sin Dependencia</option>
+                    {getValidPredecessors(node.id).map((t: any) => (
+                      <option key={t.id} value={t.id}>{t.task_name.substring(0, 20)}{t.task_name.length > 20 ? '...' : ''}</option>
+                    ))}
+                  </select>
+                  <LinkIcon size={12} className="role-select-icon" />
+                </div>
+                {/* Progreso (%) removido del estimador por solicitud del usuario */}
                 <button 
                   className={`icon-btn tiny ${editingDetailsId === node.id ? 'active-accent' : ''}`}
                   title="Añadir descripción" 
@@ -240,17 +270,6 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
                   onClick={(e) => { e.stopPropagation(); setEditingDetailsId(editingDetailsId === node.id ? null : node.id); }}
                 >
                   <AlignLeft size={14} />
-                </button>
-              </div>
-            )}
-
-            {!readOnly && (
-              <div className="task-actions">
-                <button className="icon-btn tiny text-button" title="Añadir subtarea" onClick={(e) => { e.stopPropagation(); setAddingTaskTo(node.id); }}>
-                  <Plus size={14} />
-                </button>
-                <button className="icon-btn tiny danger" title="Eliminar" onClick={(e) => handleDelete(e, node.id)}>
-                  <Trash2 size={14} />
                 </button>
               </div>
             )}
@@ -391,15 +410,21 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
           padding: 2px 8px;
           border-radius: var(--radius-sm);
         }
-        .task-actions {
+        .task-actions-v4 {
           display: flex;
-          gap: 5px;
-          opacity: 0;
-          transition: opacity 0.2s;
+          gap: 4px;
+          margin-left: 8px;
         }
-        .task-node:hover .task-actions {
-          opacity: 1;
+        .action-btn-v4 {
+          background: transparent;
+          border: none;
+          color: var(--color-text-secondary);
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
         }
+        .action-btn-v4:hover { background: rgba(255,255,255,0.1); color: var(--color-text-primary); }
+        .action-btn-v4.delete:hover { color: #ff6b6b; }
         .add-task-inline {
           padding: 8px 10px;
           padding-left: calc(var(--depth, 0) * 32px + 24px);
@@ -431,14 +456,53 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
           font-family: monospace;
           border-radius: var(--radius-sm);
         }
-        .role-select {
-          padding: 2px 5px;
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.1);
-          color: var(--color-text-primary);
-          font-size: 0.85rem;
-          border-radius: var(--radius-sm);
+        .premium-select-v4 {
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          color: var(--color-text-secondary);
+          padding: 6px 10px;
+          border-radius: 8px;
+          font-size: 0.75rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          width: 140px;
           outline: none;
+        }
+        .premium-select-v4:hover, .premium-select-v4:focus {
+          background: rgba(255, 255, 255, 0.06);
+          border-color: var(--color-accent-mint);
+          color: var(--color-text-primary);
+        }
+        .predecessor-select-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+        .progress-input-wrapper {
+          display: flex;
+          align-items: center;
+          background: rgba(72, 229, 194, 0.1);
+          border-radius: var(--radius-sm);
+          padding: 2px 4px;
+          border: 1px solid rgba(72, 229, 194, 0.2);
+        }
+        .progress-input-mini {
+          width: 35px;
+          background: transparent;
+          border: none;
+          color: var(--color-accent-mint);
+          font-family: monospace;
+          font-size: 0.8rem;
+          text-align: right;
+          outline: none;
+          padding: 0;
+        }
+        .progress-input-mini::-webkit-inner-spin-button { display: none; }
+        .progress-input-wrapper .unit {
+          font-size: 0.7rem;
+          color: var(--color-accent-mint);
+          opacity: 0.7;
+          margin-left: 1px;
         }
         .task-details-panel {
           padding: 10px 10px 10px 0;
