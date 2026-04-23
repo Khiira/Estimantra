@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { insforge } from '../lib/insforge';
-import { Calendar, Clock, CheckCircle, AlertCircle, Plus, Trash2, TrendingUp, ShieldCheck, Activity } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, AlertCircle, Plus, Trash2, TrendingUp, ShieldCheck, Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import { format, addDays, parseISO, differenceInCalendarDays } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Gantt, ViewMode } from 'gantt-task-react';
+import type { Task } from 'gantt-task-react';
+import 'gantt-task-react/dist/index.css';
 
 interface ProjectTrackingProps {
   project: any;
@@ -25,6 +28,9 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
   const [trackingMode, setTrackingMode] = useState<'linear' | 'parallel'>(project.tracking_mode || 'linear');
   const [targetDate, setTargetDate] = useState(project.target_delivery_date || '');
   const [localTasks, setLocalTasks] = useState<any[]>(tasks);
+  const [ganttView, setGanttView] = useState<'ideal' | 'projected'>('projected');
+  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Day);
+  const [isGanttCollapsed, setIsGanttCollapsed] = useState(false);
 
   useEffect(() => {
     setLocalTasks(tasks);
@@ -148,235 +154,143 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
     const newHolidays = holidays.filter((h: any) => (typeof h === 'string' ? h : h.date) !== date);
     setHolidays(newHolidays);
     handleUpdateConfig({ holidays: newHolidays });
-  };
-
-  const calculateEndDate = (useRemaining = true) => {
-    if (!startDate || tasks.length === 0) return null;
-    
-    const workingDaysList = Array.isArray(project?.working_days) ? project.working_days.map(Number) : [1, 2, 3, 4, 5];
-    const startDateObj = startDate ? (startDate.includes('-') ? parseISO(startDate) : new Date()) : new Date();
-    startDateObj.setHours(12, 0, 0, 0);
-
-    const leafTasks = tasks.filter(t => !tasks.some(child => child.parent_id === t.id));
-    const hours = leafTasks.reduce((acc, t) => {
-      const estimated = Number(t.estimated_hours || 0);
-      return acc + (useRemaining ? estimated * (1 - (Number(t.progress || 0) / 100)) : estimated);
-    }, 0);
-
-    if (hours <= 0) return startDateObj;
-
+  };  const calculateEndWithWeekends = (startDate: Date, workingHours: number) => {
+    let current = new Date(startDate);
+    let remainingHours = workingHours;
     const hoursPerDay = project.hours_per_day || 8;
-    let remaining = hours;
-    let iterations = 0;
-    let current = new Date(startDateObj);
-
-    while (remaining > 0 && iterations < 1000) {
-      iterations++;
+    
+    while (remainingHours > 0) {
+      const isWorking = workingDays.includes(current.getDay());
       const dateStr = format(current, 'yyyy-MM-dd');
-      const isWorkingDay = workingDaysList.includes(current.getDay());
-      const specialDay = (allHolidays || []).find(h => h.date === dateStr);
+      const isHoliday = allHolidays.some(h => h.date === dateStr);
       
-      if (isWorkingDay) {
-        remaining -= specialDay ? Number(specialDay.hours || 0) : hoursPerDay;
-      }
-      if (remaining > 0) current = addDays(current, 1);
-    }
-    return current;
-  };
-
-  const calculateParallelEndDate = () => {
-    if (!startDate || tasks.length === 0) return null;
-
-    const [year, month, day] = startDate.split('-').map(Number);
-    let current = new Date(year, month - 1, day, 12, 0, 0);
-
-    const hoursPerDay = project.hours_per_day || 8;
-    
-    // Filtrar solo tareas hoja que tengan horas y no estén terminadas
-    let pendingTasks = tasks
-      .filter(t => !tasks.some(child => child.parent_id === t.id) && (Number(t.estimated_hours) > 0))
-      .map(t => ({ ...t, remaining: Number(t.estimated_hours) * (1 - (Number(t.progress || 0) / 100)) }))
-      .filter(t => t.remaining > 0);
-
-    if (pendingTasks.length === 0) return new Date();
-
-    // Capacidad por rol basada en el equipo
-    const capacityByRole: Record<string, number> = {};
-    teamMembers.forEach(m => {
-      if (m.role_id) {
-        capacityByRole[m.role_id] = (capacityByRole[m.role_id] || 0) + 1;
-      }
-    });
-
-    let iterations = 0;
-    while (pendingTasks.length > 0 && iterations < 1000) {
-      iterations++;
-      const dayOfWeek = current.getDay();
-      const dateStr = format(current, 'yyyy-MM-dd');
-      const isWorkingDay = workingDays.map(Number).includes(dayOfWeek);
-      const specialDay = allHolidays.find(h => h.date === dateStr);
-
-      if (isWorkingDay) {
-        const dailyAvailableHours = specialDay ? Number(specialDay.hours || 0) : hoursPerDay;
-
-        if (dailyAvailableHours > 0) {
-          // 1. Identificar tareas listas (sin dependencias pendientes)
-          const readyTasks = pendingTasks.filter(t => 
-            !t.predecessor_id || !pendingTasks.some(p => p.id === t.predecessor_id)
-          );
-
-          // 2. Asignar recursos y restar horas
-          const usedCapacity: Record<string, number> = {};
-          
-          for (const task of readyTasks) {
-            const roleId = task.assigned_role_id || 'unassigned';
-            const capacity = capacityByRole[roleId] || 1; // Por defecto 1 si no hay equipo definido o es genérico
-            
-            if ((usedCapacity[roleId] || 0) < capacity) {
-              const reduction = Math.min(task.remaining, dailyAvailableHours);
-              task.remaining -= reduction;
-              usedCapacity[roleId] = (usedCapacity[roleId] || 0) + 1;
-            }
-          }
-
-          // 3. Limpiar tareas terminadas
-          pendingTasks = pendingTasks.filter(t => t.remaining > 0);
+      if (isWorking && !isHoliday) {
+        if (remainingHours <= hoursPerDay) {
+          current = new Date(current.getTime() + (remainingHours / hoursPerDay) * 24 * 60 * 60 * 1000);
+          remainingHours = 0;
+        } else {
+          remainingHours -= hoursPerDay;
+          current = addDays(current, 1);
         }
-      }
-
-      if (pendingTasks.length > 0) {
+      } else {
         current = addDays(current, 1);
       }
     }
-
     return current;
   };
 
-  // Fecha de Entrega si todo va perfecto (basado en estimaciones totales)
-  const idealEndDate = calculateEndDate(false);
-  
-  // Fecha de Entrega proyectada según el avance actual
-  const projectedEndDate = calculateEndDate(true);
+  const projectStartDate = useMemo(() => {
+    let d = new Date();
+    if (startDate && startDate.includes('-')) {
+      const [year, month, day] = startDate.split('-');
+      d = new Date(Number(year), Number(month) - 1, Number(day), 9, 0, 0);
+    } else {
+      d.setHours(9, 0, 0, 0);
+    }
+    return d;
+  }, [startDate]);
 
-  const simulationSchedule = useMemo(() => {
-    if (!startDate || tasks.length === 0) return [];
-    let iterations = 0;
-    const hoursPerDay = project.hours_per_day || 8;
-
-    const workingDaysList = Array.isArray(project?.working_days) ? project.working_days.map(Number) : [1, 2, 3, 4, 5];
-    const startDateObj = startDate ? (startDate.includes('-') ? parseISO(startDate) : new Date()) : new Date();
-    startDateObj.setHours(12, 0, 0, 0);
-    let current = new Date(startDateObj);
-
-    let pendingTasks = tasks
-      .filter(t => !tasks.some(child => child.parent_id === t.id) && (Number(t.estimated_hours) > 0))
-      .map(t => ({ ...t, remaining: Number(t.estimated_hours) }));
+  const dualSchedule = useMemo(() => {
+    if (!startDate || localTasks.length === 0) return { ideal: [], projected: [] };
     
-    // Incluir tareas al 100% solo para el histórico del gráfico
-    const schedule: any[] = [];
-    tasks.filter(t => !tasks.some(child => child.parent_id === t.id) && Number(t.progress) === 100).forEach(t => {
-      const sDate = t.actual_start_date ? parseISO(t.actual_start_date) : parseISO(startDate);
-      const eDate = t.actual_end_date ? parseISO(t.actual_end_date) : sDate;
-      schedule.push({
-        id: t.id,
-        name: t.task_name,
-        start: format(sDate, 'yyyy-MM-dd'),
-        startIndex: 0,
-        end: format(eDate, 'yyyy-MM-dd'),
-        endIndex: 0,
-        roleId: t.assigned_role_id,
-        color: roles.find((r: any) => r.id === t.assigned_role_id)?.color_hex || '#444',
-        progress: 100,
-        isPast: true
-      });
-    });
-
-    const capacityByRole: Record<string, number> = {};
-    teamMembers.forEach(m => {
-      if (m.role_id) capacityByRole[m.role_id] = (capacityByRole[m.role_id] || 0) + 1;
-    });
-
-    while (pendingTasks.some(t => t.remaining > 0) && iterations < 1000) {
-      iterations++;
-      const dateStr = format(current, 'yyyy-MM-dd');
-      const isWorkingDay = workingDaysList.includes(current.getDay());
-      const specialDay = (allHolidays || []).find(h => h.date === dateStr);
+    const startDateObj = projectStartDate;
+    
+    const buildTasks = (useProgress: boolean) => {
+      const result: Task[] = [];
+      const taskDates = new Map<string, { start: Date, end: Date }>();
       
-      if (isWorkingDay) {
-        const dailyLimit = specialDay ? Number(specialDay.hours || 0) : hoursPerDay;
+      const getTaskDates = (taskId: string): { start: Date, end: Date } => {
+        if (taskDates.has(taskId)) return taskDates.get(taskId)!;
         
-        if (dailyLimit > 0) {
-          // Seguimiento de horas disponibles este día
-          let globalRemaining = dailyLimit; // Para modo lineal
-          const roleRemaining: Record<string, number> = {}; // Para modo paralelo
-          Object.keys(capacityByRole).forEach(rId => {
-            roleRemaining[rId] = capacityByRole[rId] * dailyLimit;
-          });
-          const unassignedRemaining = (teamMembers.length || 1) * dailyLimit;
-
-          while ((trackingMode === 'linear' ? globalRemaining > 0 : true) && pendingTasks.some(t => t.remaining > 0)) {
-            // Identificar tareas listas (sin predecesores pendientes)
-            const readyTasks = pendingTasks.filter(t => {
-              if (t.remaining <= 0) return false;
-              if (!t.predecessor_id) return true;
-              const pred = tasks.find(p => p.id === t.predecessor_id);
-              return pred && Number(pred.progress) === 100 && !pendingTasks.some(p => p.id === t.predecessor_id && p.remaining > 0);
-            });
-
-            if (readyTasks.length === 0) break; // Bloqueo por dependencias
-
-            let taskStartedInLoop = false;
-            for (const task of readyTasks) {
-              const rId = task.assigned_role_id;
-              let available = 0;
-              
-              if (trackingMode === 'linear') {
-                available = globalRemaining;
-              } else {
-                available = rId ? (roleRemaining[rId] || dailyLimit) : unassignedRemaining;
-              }
-
-              if (available > 0) {
-                const reduction = Math.min(task.remaining, available);
-                task.remaining -= reduction;
-                taskStartedInLoop = true;
-
-                if (trackingMode === 'linear') {
-                  globalRemaining -= reduction;
-                } else {
-                  if (rId) roleRemaining[rId] -= reduction;
-                }
-
-                let entry = schedule.find(s => s.id === task.id);
-                if (!entry) {
-                  entry = {
-                    id: task.id,
-                    name: task.task_name,
-                    start: dateStr,
-                    startIndex: iterations,
-                    end: dateStr,
-                    endIndex: iterations,
-                    roleId: task.assigned_role_id,
-                    color: roles.find((r: any) => r.id === task.assigned_role_id)?.color_hex || 'var(--color-accent-mint)',
-                    progress: task.progress || 0
-                  };
-                  schedule.push(entry);
-                }
-                entry.end = dateStr;
-                entry.endIndex = iterations;
-
-                if (trackingMode === 'linear' && globalRemaining <= 0) break;
-              }
+        const t = localTasks.find(x => x.id === taskId);
+        if (!t) return { start: startDateObj, end: addDays(startDateObj, 1) };
+        
+        let baseStart = new Date(startDateObj);
+        const hasStarted = useProgress && t.actual_start_date && (t.progress || 0) > 0;
+        
+        if (hasStarted) {
+            baseStart = parseISO(t.actual_start_date!);
+            if (baseStart < startDateObj) {
+              baseStart = new Date(startDateObj);
             }
-            if (!taskStartedInLoop) break;
+        } else if (t.predecessor_id) {
+          const pred = getTaskDates(t.predecessor_id);
+          baseStart = new Date(pred.end);
+        } else if (trackingMode === 'linear') {
+          const leaves = localTasks.filter(x => !localTasks.some(child => child.parent_id === x.id));
+          const index = leaves.findIndex(x => x.id === t.id);
+          if (index > 0) {
+             const prevTask = leaves[index - 1];
+             const prev = getTaskDates(prevTask.id);
+             baseStart = new Date(prev.end);
           }
         }
-      }
-      current = addDays(current, 1);
-    }
-    return schedule;
-  }, [startDate, tasks, roles, teamMembers, project.working_days, allHolidays, trackingMode, project.hours_per_day]);
+        
+        let remainingHours = Number(t.estimated_hours || 0);
+        let end = new Date(baseStart);
 
+        if (!useProgress || !hasStarted) {
+            // Plan Ideal OR 0% Progress: perfectly follows the theory
+            end = remainingHours > 0 
+              ? calculateEndWithWeekends(baseStart, remainingHours)
+              : new Date(baseStart.getTime() + 2 * 60 * 60 * 1000);
+        } else {
+            // Ejecución Real (En Progreso o Completado)
+            if (t.progress === 100) {
+                end = t.actual_end_date ? parseISO(t.actual_end_date) : new Date(baseStart.getTime() + 2 * 60 * 60 * 1000);
+                if (end.getTime() < baseStart.getTime()) {
+                    end = new Date(baseStart.getTime() + 2 * 60 * 60 * 1000);
+                }
+            } else {
+                remainingHours = remainingHours * (1 - (Number(t.progress || 0) / 100));
+                // Calculamos lo que falta desde AHORA (o desde el inicio si es en el futuro)
+                const calcStart = new Date(Math.max(baseStart.getTime(), new Date().getTime()));
+                end = remainingHours > 0 
+                    ? calculateEndWithWeekends(calcStart, remainingHours)
+                    : new Date(calcStart.getTime() + 2 * 60 * 60 * 1000);
+            }
+        } 
+          
+        const dates = { start: baseStart, end: end };
+        taskDates.set(taskId, dates);
+        return dates;
+      };
+      
+      localTasks.forEach(t => {
+         const hasChildren = localTasks.some(child => child.parent_id === t.id);
+         if (hasChildren) return;
+         
+         const dates = getTaskDates(t.id);
+         const roleColor = roles.find((r: any) => r.id === t.assigned_role_id)?.color_hex || '#4fd1c5';
+         
+         result.push({
+            id: t.id,
+            name: t.task_name,
+            start: dates.start,
+            end: dates.end,
+            progress: useProgress ? (t.progress || 0) : 0,
+            dependencies: t.predecessor_id ? [t.predecessor_id] : undefined,
+            type: 'task',
+            project: project.id,
+            styles: {
+               backgroundColor: ganttView === 'ideal' && useProgress === false ? `${roleColor}88` : roleColor,
+               progressColor: 'rgba(255,255,255,0.3)',
+               progressSelectedColor: 'rgba(255,255,255,0.5)',
+            }
+         });
+      });
+      
+      return result.sort((a, b) => a.start.getTime() - b.start.getTime());
+    };
+
+    return {
+      ideal: buildTasks(false),
+      projected: buildTasks(true)
+    };
+  }, [startDate, localTasks, roles, workingDays, allHolidays, trackingMode, project.hours_per_day, ganttView]);
+
+  const idealEndDate = dualSchedule.ideal.length > 0 ? new Date(Math.max(...dualSchedule.ideal.map((t: any) => t.end.getTime()))) : null;
+  const projectedEndDate = dualSchedule.projected.length > 0 ? new Date(Math.max(...dualSchedule.projected.map((t: any) => t.end.getTime()))) : null;
   const endDate = idealEndDate;
 
   // Automatización de Fecha Objetivo (Solo si no existe)
@@ -423,37 +337,43 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
                             </div>
                             <span className="t-meta">
                               {isLeaf && (roles.find((r: any) => r.id === task.assigned_role_id)?.name || 'Sin perfil')}
-                              {task.actual_start_date && ` • Iniciado: ${format(parseISO(task.actual_start_date), 'dd/MM')}`}
-                              {task.actual_end_date && ` • Fin: ${format(parseISO(task.actual_end_date), 'dd/MM')}`}
+                              {task.actual_start_date && ` • Iniciado: ${format(Math.max(parseISO(task.actual_start_date).getTime(), projectStartDate.getTime()), 'dd/MM')}`}
+                              {task.actual_end_date && ` • Fin: ${format(Math.max(parseISO(task.actual_end_date).getTime(), projectStartDate.getTime()), 'dd/MM')}`}
                             </span>
                           </div>
                           <div className="t-action">
                             {isLeaf ? (
-                              <input 
-                                type="range" 
-                                min="0" max="100" 
-                                value={task.progress || 0}
-                                disabled={isBlocked}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value);
-                                  setLocalTasks(prev => prev.map(t => t.id === task.id ? { ...t, progress: val } : t));
-                                }}
-                                onMouseUp={async (e: any) => {
-                                  const val = parseInt(e.target.value);
-                                  const updates: any = { progress: val };
-                                  
-                                  const oldTask = tasks.find(t => t.id === task.id);
-                                  if (val > 0 && !oldTask?.actual_start_date) {
-                                    updates.actual_start_date = new Date().toISOString();
-                                  }
-                                  if (val === 100 && !oldTask?.actual_end_date) {
-                                    updates.actual_end_date = new Date().toISOString();
-                                  }
+                              <div className="flex items-center justify-end w-full gap-3">
+                                <input 
+                                  type="range" 
+                                  min="0" max="100" 
+                                  value={task.progress || 0}
+                                  disabled={isBlocked}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    setLocalTasks(prev => prev.map(t => t.id === task.id ? { ...t, progress: val } : t));
+                                  }}
+                                  onMouseUp={async (e: any) => {
+                                    const val = parseInt(e.target.value);
+                                    const updates: any = { progress: val };
+                                    
+                                    const oldTask = tasks.find(t => t.id === task.id);
+                                    const now = new Date();
+                                    
+                                    if (val > 0 && !oldTask?.actual_start_date) {
+                                      updates.actual_start_date = now < projectStartDate ? projectStartDate.toISOString() : now.toISOString();
+                                    }
+                                    if (val === 100 && !oldTask?.actual_end_date) {
+                                      updates.actual_end_date = now < projectStartDate ? projectStartDate.toISOString() : now.toISOString();
+                                    }
 
-                                  await insforge.database.from('tasks').update(updates).eq('id', task.id);
-                                }}
-                                className="progress-slider-v4"
-                              />
+                                    await insforge.database.from('tasks').update(updates).eq('id', task.id);
+                                  }}
+                                  className="progress-slider-v4"
+                                  style={{ width: '100%' }}
+                                />
+                                <span className="t-pct" style={{ minWidth: '45px' }}>{task.progress || 0}%</span>
+                              </div>
                             ) : (
                               <div className="parent-progress-mini">
                                 <div className="p-mini-fill" style={{ width: `${progress}%` }}></div>
@@ -468,12 +388,12 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
   };
 
   const totalProgress = useMemo(() => {
-    const leafTasks = tasks.filter(t => !tasks.some(child => child.parent_id === t.id));
+    const leafTasks = localTasks.filter(t => !localTasks.some(child => child.parent_id === t.id));
     if (leafTasks.length === 0) return 0;
     const weightedSum = leafTasks.reduce((acc, t) => acc + (Number(t.progress || 0) * Number(t.estimated_hours || 0)), 0);
     const totalEstHours = leafTasks.reduce((acc, t) => acc + Number(t.estimated_hours || 0), 0);
     return totalEstHours > 0 ? Math.round(weightedSum / totalEstHours) : 0;
-  }, [tasks]);
+  }, [localTasks]);
 
   const projectStatus = useMemo(() => {
     if (!endDate || !targetDate) return { label: 'Sin objetivo', color: 'text-mint', icon: <CheckCircle size={14} />, diff: 0 };
@@ -670,121 +590,204 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
 
         {/* Lado Derecho: Visualización y Dashboard */}
         <div className="tracking-main">
-          {/* Tarjeta Hero: Meta Ideal */}
+          {/* Tarjeta Hero Consolidada: Meta vs Proyectada */}
           <div className="glass-card original-hero-card meta-hero">
-            <div className="hero-header-flex">
-              <CheckCircle size={20} className="text-mint" />
-              <span className="hero-label">Fecha Meta (Plan Ideal)</span>
-            </div>
-            <h2 className="hero-date-large">
-              {idealEndDate ? format(idealEndDate, "d 'de' MMMM, yyyy", { locale: es }) : "Define inicio"}
-            </h2>
-            <div className="hero-footer-flex">
-              <div className="flex align-center gap-10">
-                <Clock size={14} className="opacity-50" />
-                <span>{totalHours}h totales estimadas</span>
+            <div className="flex flex-col md:flex-row justify-between gap-6">
+              
+              {/* Lado Izquierdo: Plan Ideal */}
+              <div className="flex-1">
+                <div className="hero-header-flex mb-2 opacity-80">
+                  <CheckCircle size={18} className="text-mint" />
+                  <span className="hero-label uppercase tracking-wider text-sm">Fecha Meta (Plan Ideal)</span>
+                </div>
+                <h2 className="text-3xl font-bold text-white mb-4">
+                  {idealEndDate ? format(idealEndDate, "d 'de' MMMM, yyyy", { locale: es }) : "Define inicio"}
+                </h2>
+                <div className="flex align-center gap-6 text-sm opacity-60">
+                  <div className="flex align-center gap-2">
+                    <Clock size={14} />
+                    <span>{totalHours}h estimadas</span>
+                  </div>
+                  <div className="flex align-center gap-2">
+                    <TrendingUp size={14} className="text-mint" />
+                    <span>{trackingMode === 'linear' ? 'Secuencial' : 'Paralelo'}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex align-center gap-10">
-                <TrendingUp size={14} className="text-mint" />
-                <span>Modo: {trackingMode === 'linear' ? 'Secuencial' : 'Paralelo'}</span>
+
+              {/* Lado Derecho: Avance Real / Proyección */}
+              <div className="flex-1 md:border-l md:border-white/10 md:pl-6">
+                <div className="hero-header-flex mb-2 opacity-80 justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity size={18} className="text-blue-400" />
+                    <span className="hero-label uppercase tracking-wider text-sm">Entrega Proyectada (Real)</span>
+                  </div>
+                  {(() => {
+                    const metaDiff = projectedEndDate && idealEndDate ? differenceInCalendarDays(projectedEndDate, idealEndDate) : 0;
+                    const isDelayed = metaDiff > 0;
+                    const isAhead = metaDiff < 0;
+                    const absDiff = Math.abs(metaDiff);
+                    return (
+                      <div className="flex align-center gap-2">
+                        {metaDiff !== 0 && (
+                          <span className={`status-badge-v4 ${isAhead ? 'ahead' : 'delayed'} px-2 py-0.5 rounded text-xs font-bold`}>
+                            {isAhead ? 'Adelantado' : 'Retraso'} {isAhead ? '-' : '+'}{absDiff}d
+                          </span>
+                        )}
+                        {metaDiff === 0 && <span className="status-badge-v4 ahead px-2 py-0.5 rounded text-xs font-bold">En Tiempo</span>}
+                      </div>
+                    );
+                  })()}
+                </div>
+                <h2 className="text-3xl font-bold text-blue-300 mb-4">
+                  {projectedEndDate ? format(projectedEndDate, "d 'de' MMMM, yyyy", { locale: es }) : "-"}
+                </h2>
+                <div className="progress-bar-v3 h-2 rounded bg-white/5 overflow-hidden">
+                  <div className="progress-fill-v3 h-full bg-blue-500 transition-all duration-500" style={{ width: `${totalProgress}%` }}></div>
+                </div>
+                <div className="text-right mt-1 text-xs text-blue-300/60 font-medium">{totalProgress}% Completado</div>
               </div>
+
             </div>
           </div>
 
-          <div className="tracking-grid-stats">
-            <div className="glass-card stat-card-v3">
-              <div className="flex-between margin-bottom-10">
-                <span className="stat-title">Progreso del Proyecto</span>
-                <span className="stat-value">{totalProgress}%</span>
+          <div className="tracking-panels-grid">
+            <div className="glass-card gantt-preview-panel">
+            <div 
+              className="panel-header-v4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
+              onClick={() => setIsGanttCollapsed(!isGanttCollapsed)}
+            >
+              <div className="flex items-center gap-2">
+                <Activity size={18} />
+                <span>Simulación de Cronograma ({trackingMode === 'linear' ? 'Lineal' : 'Paralelo'})</span>
+                {isGanttCollapsed ? <ChevronDown size={16} className="opacity-50 ml-2" /> : <ChevronUp size={16} className="opacity-50 ml-2" />}
               </div>
-              <div className="progress-bar-v3">
-                <div className="progress-fill-v3" style={{ width: `${totalProgress}%` }}></div>
+              <div className="text-xs text-warning flex items-center gap-1.5 bg-warning/10 px-3 py-1 rounded-full font-bold">
+                <AlertCircle size={12} />
+                Cálculo Inteligente Activado
               </div>
             </div>
+            
+            {!isGanttCollapsed && (
+              <div className="gantt-scroll scroll-styled">
+                <div className="gantt-container relative">
+                
+                {/* Switch Premium para Vistas y Zoom */}
+                {(dualSchedule.ideal.length > 0 || dualSchedule.projected.length > 0) && (
+                  <div className="flex justify-between items-center mb-6 px-4">
+                    <div className="bg-black/30 p-1 rounded-xl flex shadow-inner border border-white/5">
+                      <button 
+                        onClick={() => setGanttView('ideal')}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-300 ${ganttView === 'ideal' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70'}`}
+                      >
+                        Plan Ideal
+                      </button>
+                      <button 
+                        onClick={() => setGanttView('projected')}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-300 flex items-center gap-2 ${ganttView === 'projected' ? 'bg-mint/20 text-mint shadow-sm' : 'text-white/40 hover:text-white/70'}`}
+                      >
+                        <Activity size={12} />
+                        Ejecución Real
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-            <div className="glass-card stat-card-v3">
-              <div className="flex-between margin-bottom-10">
-                <span className="stat-title">Entrega Proyectada (Avance Real)</span>
                 {(() => {
-                  const metaDiff = projectedEndDate && idealEndDate ? differenceInCalendarDays(projectedEndDate, idealEndDate) : 0;
-                  const isDelayed = metaDiff > 0;
-                  const isAhead = metaDiff < 0;
-                  const absDiff = Math.abs(metaDiff);
+                  const tasksToRender = ganttView === 'ideal' ? dualSchedule.ideal : dualSchedule.projected;
+                  
+                  if (tasksToRender.length === 0) return <p className="empty-msg p-20">Completa la estimación para ver la simulación.</p>;
+                  
+                  const CustomTooltip = ({ task }: { task: Task }) => {
+                    return (
+                      <div 
+                        style={{ background: '#1c2541', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                        className="rounded-lg p-3 shadow-xl min-w-[180px] z-50"
+                      >
+                        <div className="font-bold text-sm mb-1">{task.name}</div>
+                        <div className="text-xs opacity-60 mb-2">
+                          {format(task.start, 'dd MMM yyyy')} - {format(task.end, 'dd MMM yyyy')}
+                        </div>
+                        <div className="progress-bar-v3 h-1.5 rounded bg-white/10 overflow-hidden mb-1">
+                          <div className="progress-fill-v3 h-full transition-all" style={{ width: `${task.progress}%`, background: 'var(--color-accent-mint)' }}></div>
+                        </div>
+                        <div className="text-xs font-bold text-right" style={{ color: 'var(--color-accent-mint)' }}>
+                          {task.progress}% completado
+                        </div>
+                      </div>
+                    );
+                  };
+
                   return (
-                    <div className="flex align-center gap-10">
-                      <span className="s-value">{isAhead ? 'Adelantado' : isDelayed ? 'Con Retraso' : 'En Tiempo'}</span>
-                      {metaDiff !== 0 && (
-                        <span className={`status-badge-v4 ${isAhead ? 'ahead' : 'delayed'}`}>
-                          {isAhead ? '-' : '+'}{absDiff}d
-                        </span>
-                      )}
+                    <div className="react-gantt-wrapper relative" style={{ overflow: 'hidden', width: '100%', borderRadius: '12px', background: '#1c2541' }}>
+                      <style>{`
+                        /* 1. Fondo Global del SVG */
+                        .react-gantt-wrapper svg {
+                          background: #1c2541 !important;
+                        }
+                        
+                        /* 2. Forzar Transparencia en el Fondo y Cabeceras */
+                        /* Hack: Como las clases están ofuscadas, hacemos transparentes todos los rectángulos */
+                        /* EXCEPTO los que tienen bordes redondeados (rx), que son las barras de tareas */
+                        /* Y EXCEPTO el marcador de 'hoy' que usa un fill específico */
+                        .react-gantt-wrapper svg rect:not([rx]):not([fill="rgba(79, 209, 197, 0.1)"]) {
+                          fill: transparent !important;
+                        }
+                        
+                        /* 3. Color de las Líneas del Grid y Calendario */
+                        .react-gantt-wrapper svg line,
+                        .react-gantt-wrapper svg path:not([stroke-width="1.5"]) {
+                          stroke: rgba(255,255,255,0.05) !important;
+                        }
+                        
+                        /* 4. Color del Texto del Calendario (Fechas) */
+                        .react-gantt-wrapper svg text {
+                          fill: rgba(255,255,255,0.7) !important;
+                          font-family: 'Outfit', sans-serif !important;
+                          font-weight: 600 !important;
+                        }
+                        
+                        /* 5. Estilos de las Dependencias (Flechas) */
+                        .react-gantt-wrapper path[stroke-width="1.5"] { 
+                          stroke: var(--color-accent-mint) !important; 
+                        }
+                        
+                        /* 6. Ocultar Tooltip Nativo */
+                        .react-gantt-wrapper [class*="tooltip"], ._2eZzQ { 
+                          background: transparent !important; 
+                          border: none !important; 
+                          box-shadow: none !important; 
+                        }
+                      `}</style>
+                      
+                      {/* Controles de Zoom Flotantes */}
+                      <div className="absolute top-4 right-4 z-10 bg-[#1c2541]/80 backdrop-blur-md p-1 rounded-xl flex shadow-xl border border-white/10">
+                        <button onClick={() => setViewMode(ViewMode.Day)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === ViewMode.Day ? 'bg-mint/20 text-mint' : 'text-white/40 hover:text-white/70'}`}>Día</button>
+                        <button onClick={() => setViewMode(ViewMode.Week)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === ViewMode.Week ? 'bg-mint/20 text-mint' : 'text-white/40 hover:text-white/70'}`}>Semana</button>
+                        <button onClick={() => setViewMode(ViewMode.Month)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === ViewMode.Month ? 'bg-mint/20 text-mint' : 'text-white/40 hover:text-white/70'}`}>Mes</button>
+                      </div>
+
+                      <Gantt
+                        tasks={tasksToRender}
+                        viewMode={viewMode}
+                        listCellWidth=""
+                        TooltipContent={CustomTooltip as any}
+                        columnWidth={viewMode === ViewMode.Month ? 200 : 60}
+                        rowHeight={50}
+                        fontSize="12"
+                        barCornerRadius={6}
+                        fontFamily="Outfit, sans-serif"
+                        todayColor="rgba(79, 209, 197, 0.1)"
+                        arrowColor="#4fd1c5"
+                        arrowIndent={20}
+                        locale="es"
+                      />
                     </div>
                   );
                 })()}
               </div>
-              <div className="health-indicator-v4">
-                <div className="flex flex-column">
-                  <span className="projected-date-small">
-                    {projectedEndDate ? format(projectedEndDate, 'dd MMM, yyyy', { locale: es }) : '-'}
-                  </span>
-                </div>
-              </div>
             </div>
-          </div>
-
-          <div className="glass-card gantt-preview-panel">
-            <div className="panel-header-v4">
-              <Activity size={18} />
-              <span>Simulación de Cronograma ({trackingMode === 'linear' ? 'Lineal' : 'Paralelo'})</span>
-            </div>
-            <div className="gantt-scroll scroll-styled">
-              <div className="gantt-container" style={{ width: `${Math.max(800, (simulationSchedule.filter(s => !s.isPast).pop()?.endIndex || 1) * 40 + 200)}px` }}>
-                {simulationSchedule.map((item) => (
-                  <div key={item.id} className="gantt-row">
-                    <div className="gantt-task-info">
-                      <span className="gantt-task-name">{item.name}</span>
-                    </div>
-                    <div className="gantt-track">
-                      {item.isPast ? (
-                        <div 
-                          className="gantt-bar past" 
-                          style={{ 
-                            left: '0', 
-                            width: '40px',
-                            background: '#444'
-                          }}
-                        >
-                          <CheckCircle size={10} />
-                        </div>
-                      ) : (
-                        <div 
-                          className="gantt-bar" 
-                          style={{ 
-                            left: `${(item.startIndex - 1) * 40}px`, 
-                            width: `${Math.max(30, (item.endIndex - item.startIndex + 1) * 40)}px`,
-                            background: item.color,
-                            boxShadow: `0 0 10px ${item.color}44`
-                          }}
-                        >
-                          <span className="gantt-bar-label">{format(parseISO(item.start), 'dd MMM')}</span>
-                        </div>
-                      )}
-                      {!item.isPast && item.progress > 0 && (
-                        <div 
-                          className="gantt-actual-bar" 
-                          style={{ 
-                            left: `${(item.startIndex - 1) * 40}px`, 
-                            width: `${((item.endIndex - item.startIndex + 1) * 40) * (item.progress / 100)}px`,
-                            background: 'rgba(255,255,255,0.5)'
-                          }}
-                        ></div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {simulationSchedule.length === 0 && <p className="empty-msg p-20">Completa la estimación para ver la simulación.</p>}
-              </div>
-            </div>
+            )}
           </div>
 
           <div className="glass-card task-tracking-panel">
@@ -796,13 +799,6 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
               {renderTrackingNode(null)}
             </div>
           </div>
-
-          <div className="glass-card info-card-v3">
-            <AlertCircle size={18} className="text-warning" />
-            <div className="info-content">
-              <p><strong>Cálculo Inteligente Activado</strong></p>
-              <p className="opacity-70">El sistema ajusta la fecha considerando feriados nacionales, jornadas parciales manuales y días no laborables configurados.</p>
-            </div>
           </div>
         </div>
       </div>
@@ -813,8 +809,9 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
         .sidebar-collapsed .tracking-layout { grid-template-columns: 0px 1fr; gap: 0; }
         .sidebar-collapsed .tracking-sidebar { opacity: 0; pointer-events: none; transform: translateX(-30px); width: 0; overflow: hidden; padding: 0; border: none; }
 
-        .tracking-sidebar { width: 320px; transition: all 0.4s ease; }
+        .tracking-sidebar { width: 320px; transition: all 0.4s ease; flex-shrink: 0; }
         .glass-card { background: rgba(28, 37, 65, 0.4); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 24px; }
+        .tracking-panels-grid { display: flex; flex-direction: column; gap: 24px; }
         .section-title { font-size: 1rem; color: white; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
         .config-group { margin-bottom: 24px; }
         .config-label { display: block; font-size: 0.75rem; color: var(--color-text-secondary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; }
@@ -891,28 +888,28 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
 
         .health-indicator-v4 { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin-top: 10px; font-weight: 600; }
         
-        .task-tracking-panel { margin-top: 24px; padding: 0; overflow: hidden; }
+        .task-tracking-panel { margin-top: 0px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
         .panel-header-v4 { padding: 15px 20px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 10px; font-weight: 600; }
-        .task-tracking-list { max-height: 400px; overflow-y: auto; padding: 10px 0; }
+        .task-tracking-list { max-height: 600px; overflow-y: auto; padding: 10px 0; }
         .tracking-parent-group { margin-bottom: 0px; }
         .parent-row { padding: 10px 20px; background: rgba(255,255,255,0.02); border-left: 2px solid var(--color-accent-mint); border-bottom: 1px solid rgba(255,255,255,0.05); }
         .leaf-row { border-bottom: 1px solid rgba(255,255,255,0.03); }
         .tracking-task-row { 
           display: flex; 
           align-items: center; 
-          justify-content: space-between; 
+          justify-content: flex-start; 
           padding: 10px 20px; 
           padding-left: calc(var(--depth, 0) * 24px + 20px);
           transition: 0.2s;
         }
         .parent-row .t-name { font-size: 0.85rem; font-weight: 800; color: var(--color-accent-mint); text-transform: uppercase; }
-        .p-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent-mint); }
+        .p-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent-mint); flex-shrink: 0; }
         .parent-progress-mini { width: 100px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
         .p-mini-fill { height: 100%; background: var(--color-accent-mint); opacity: 0.6; }
         
-        .gantt-preview-panel { margin-top: 24px; padding: 0; overflow: hidden; }
-        .gantt-scroll { overflow-x: auto; padding: 20px 0; }
-        .gantt-container { min-height: 100px; display: flex; flex-direction: column; gap: 8px; padding: 0 20px; }
+        .gantt-preview-panel { margin-top: 0px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+        .gantt-scroll { overflow-x: auto; overflow-y: auto; max-height: 600px; padding: 20px 0; }
+        .gantt-container { min-height: 100px; padding: 0 20px; }
         .gantt-row { display: flex; align-items: center; gap: 20px; height: 32px; }
         .gantt-task-info { min-width: 150px; max-width: 150px; overflow: hidden; }
         .gantt-task-name { font-size: 0.7rem; color: var(--color-text-secondary); white-space: nowrap; text-overflow: ellipsis; }
@@ -922,11 +919,11 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
         .gantt-bar-label { font-size: 0.55rem; color: var(--color-bg-primary); font-weight: 800; white-space: nowrap; }
 
         .tracking-task-row:hover { background: rgba(255,255,255,0.02); }
-        .t-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+        .t-info { display: flex; flex-direction: column; gap: 2px; width: 350px; flex-shrink: 0; }
         .t-name { font-size: 0.9rem; font-weight: 600; color: white; }
         .t-meta { font-size: 0.7rem; color: var(--color-text-secondary); opacity: 0.6; }
-        .t-action { display: flex; align-items: center; gap: 15px; min-width: 200px; }
-        .t-pct { font-size: 0.85rem; font-family: monospace; color: var(--color-accent-mint); width: 40px; text-align: right; }
+        .t-action { display: flex; align-items: center; justify-content: flex-start; gap: 15px; flex: 1; max-width: 250px; }
+        .t-pct { font-size: 0.85rem; font-family: monospace; color: var(--color-accent-mint); width: 40px; text-align: right; font-weight: bold; }
         
         .tracking-task-row.blocked { opacity: 0.5; filter: grayscale(0.5); }
         .blocked-tag { font-size: 0.6rem; background: rgba(239, 71, 111, 0.2); color: #ef476f; padding: 1px 6px; border-radius: 4px; font-weight: 800; text-transform: uppercase; }
