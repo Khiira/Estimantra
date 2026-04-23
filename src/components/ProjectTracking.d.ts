@@ -1,3 +1,4 @@
+import 'gantt-task-react/dist/index.css';
 interface ProjectTrackingProps {
     project: any;
     tasks: any[];

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { insforge } from '../lib/insforge';
-import { ChevronRight, ChevronDown, Plus, Trash2, Clock, AlignLeft, DollarSign, Link as LinkIcon } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Clock, AlignLeft, DollarSign, Link as LinkIcon } from 'lucide-react';
 
 export default function TaskTree({ tasks, roles, projectId, version, onTasksChange, onTotalsChange, readOnly }: any) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -129,37 +129,6 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
         .update({ [field]: value })
         .eq('id', id);
     }, 800); // 800ms debounce for text/inputs
-  };
-
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (readOnly) return;
-    if(!confirm("¿Eliminar tarea y todas sus subtareas?")) return;
-    
-    // Collect all descendant IDs recursively
-    const collectDescendants = (parentId: string, allTasks: any[]): string[] => {
-      const children = allTasks.filter((t: any) => t.parent_id === parentId);
-      return children.reduce((acc: string[], child: any) => {
-        return [...acc, child.id, ...collectDescendants(child.id, allTasks)];
-      }, []);
-    };
-    
-    const descendants = collectDescendants(id, tasks);
-    const idsToRemove = [...descendants.reverse(), id]; 
-    
-    const { error } = await insforge.database
-      .from('tasks')
-      .delete()
-      .in('id', idsToRemove);
-
-    if (error) {
-      console.error("Error al eliminar:", error);
-      alert("No se pudo eliminar la tarea: " + error.message);
-      return;
-    }
-
-    const idSetToRemove = new Set(idsToRemove);
-    onTasksChange(tasks.filter((t: any) => !idSetToRemove.has(t.id)));
   };
 
   const getValidPredecessors = (currentId: string) => {

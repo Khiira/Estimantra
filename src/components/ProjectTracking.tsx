@@ -24,7 +24,6 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
   const [newHolidayHours, setNewHolidayHours] = useState('0');
   const [loadingHolidays, setLoadingHolidays] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [trackingMode, setTrackingMode] = useState<'linear' | 'parallel'>(project.tracking_mode || 'linear');
   const [targetDate, setTargetDate] = useState(project.target_delivery_date || '');
   const [localTasks, setLocalTasks] = useState<any[]>(tasks);
@@ -53,7 +52,6 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
   }, [project.id, project.tracking_mode]);
 
   useEffect(() => {
-    fetchTeamMembers();
     if (!project.auto_holidays || project.auto_holidays.length === 0) {
       fetchAutoHolidays();
     } else {
@@ -61,13 +59,7 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
     }
   }, [project.id]);
 
-  const fetchTeamMembers = async () => {
-    const { data } = await insforge.database
-      .from('team_members')
-      .select('*')
-      .eq('project_id', project.id);
-    setTeamMembers(data || []);
-  };
+
 
   const fetchAutoHolidays = async () => {
     setLoadingHolidays(true);
@@ -395,18 +387,7 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
     return totalEstHours > 0 ? Math.round(weightedSum / totalEstHours) : 0;
   }, [localTasks]);
 
-  const projectStatus = useMemo(() => {
-    if (!endDate || !targetDate) return { label: 'Sin objetivo', color: 'text-mint', icon: <CheckCircle size={14} />, diff: 0 };
-    const endStr = format(endDate, 'yyyy-MM-dd');
-    
-    // Calcular diferencia en días
-    const targetObj = parseISO(targetDate);
-    const diffTime = endDate.getTime() - targetObj.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (endStr <= targetDate) return { label: 'A tiempo', color: 'text-mint', icon: <CheckCircle size={14} />, diff: diffDays };
-    return { label: 'Con Retraso', color: 'text-danger', icon: <AlertCircle size={14} />, diff: diffDays };
-  }, [endDate, targetDate]);
+
 
   // Handlers para el scroll por arrastre
   const onMouseDown = (e: React.MouseEvent) => {
@@ -624,7 +605,6 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
                   </div>
                   {(() => {
                     const metaDiff = projectedEndDate && idealEndDate ? differenceInCalendarDays(projectedEndDate, idealEndDate) : 0;
-                    const isDelayed = metaDiff > 0;
                     const isAhead = metaDiff < 0;
                     const absDiff = Math.abs(metaDiff);
                     return (
