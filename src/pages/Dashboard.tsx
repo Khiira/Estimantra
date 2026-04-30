@@ -470,6 +470,11 @@ export default function Dashboard() {
                 color: #00c2ff;
                 border: 1px solid rgba(0, 194, 255, 0.2);
               }
+              .tile-status-badge.completed {
+                background: rgba(72, 229, 194, 0.1);
+                color: var(--color-accent-mint);
+                border: 1px solid rgba(72, 229, 194, 0.3);
+              }
             `}</style>
           </div>
         )}
@@ -580,6 +585,7 @@ export default function Dashboard() {
             <option value="en_progreso">🟢 En Progreso</option>
             <option value="en_espera">🟡 En Espera</option>
             <option value="aprobado">🔵 Aprobados</option>
+            <option value="completed">✅ Finalizados</option>
           </select>
         </div>
 
@@ -653,7 +659,9 @@ export default function Dashboard() {
                       </div>
 
                       <div className={`tile-status-badge ${p.status || 'en_progreso'}`}>
-                        {p.status === 'en_espera' ? 'En Espera' : p.status === 'aprobado' ? `Aprobado (${p.approved_version || 'v1.0'})` : 'En Progreso'}
+                        {p.status === 'en_espera' ? 'En Espera' : 
+                         p.status === 'aprobado' ? `Aprobado (${p.approved_version || 'v1.0'})` : 
+                         p.status === 'completed' ? 'Finalizado' : 'En Progreso'}
                       </div>
 
                       <div className="tile-footer">

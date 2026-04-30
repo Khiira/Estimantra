@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { insforge } from '../lib/insforge';
-import { ChevronRight, ChevronDown, Plus, Clock, AlignLeft, DollarSign, Link as LinkIcon } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Clock, AlignLeft, DollarSign, Link as LinkIcon, Trash2 } from 'lucide-react';
 
 export default function TaskTree({ tasks, roles, projectId, version, onTasksChange, onTotalsChange, readOnly }: any) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -145,6 +145,30 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
     return tasks.filter((t: any) => t.id !== currentId && !descendants.has(t.id));
   };
 
+  // Eliminar tarea y sus hijos en cascada
+  const handleDeleteTask = async (taskId: string) => {
+    if (readOnly) return;
+    if (!confirm('¿Eliminar esta tarea y todas sus subtareas?')) return;
+
+    // Recopilar IDs descendientes recursivamente
+    const collectIds = (id: string): string[] => {
+      const children = tasks.filter((t: any) => t.parent_id === id);
+      return [id, ...children.flatMap((c: any) => collectIds(c.id))];
+    };
+    const idsToDelete = collectIds(taskId);
+
+    const { error } = await insforge.database
+      .from('tasks')
+      .delete()
+      .in('id', idsToDelete);
+
+    if (error) {
+      alert(`Error al eliminar: ${error.message}`);
+      return;
+    }
+    onTasksChange(tasks.filter((t: any) => !idsToDelete.includes(t.id)));
+  };
+
   // 2. Renderizado Recursivo
   const renderTaskNode = (node: any, depth = 0) => {
     const isExpanded = expanded[node.id];
@@ -153,7 +177,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
     return (
       <div key={node.id} className="task-node-wrapper">
         <div 
-          className={`task-node depth-${depth} ${readOnly && !hasChildren ? 'opacity-60' : ''}`} 
+          className={`task-node task-node-hoverable depth-${Math.min(depth, 10)} ${readOnly && !hasChildren ? 'opacity-60' : ''}`} 
           style={{ '--depth': depth } as React.CSSProperties}
         >
           
@@ -176,6 +200,31 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
           </div>
 
           <div className="task-right">
+            {/* Botones de acción que aparecen en hover */}
+            {!readOnly && (
+              <div className="task-hover-actions">
+                <button
+                  className="icon-btn tiny add-child-btn"
+                  title="Añadir subtarea hija"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAddingTaskTo(node.id);
+                    setNewTaskName('');
+                    setExpanded(prev => ({ ...prev, [node.id]: true }));
+                  }}
+                >
+                  <Plus size={13} />
+                </button>
+                <button
+                  className="icon-btn tiny delete-task-btn"
+                  title="Eliminar tarea"
+                  onClick={(e) => { e.stopPropagation(); handleDeleteTask(node.id); }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            )}
+
             {!hasChildren ? (
               <div className="task-leaf-controls">
                 <input 
@@ -267,7 +316,7 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
               onChange={e => setNewTaskName(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter') handleCreateTask(node.id);
-                if (e.key === 'Escape') setAddingTaskTo(null);
+                if (e.key === 'Escape') { setAddingTaskTo(null); setNewTaskName(''); }
               }}
               onBlur={() => handleCreateTask(node.id)}
               className="text-input"
@@ -329,10 +378,8 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
           background: rgba(28, 37, 65, 0.6);
         }
         
-        /* Tree lines for hierarchy */
-        .task-node.depth-1::before,
-        .task-node.depth-2::before,
-        .task-node.depth-3::before {
+        /* Tree lines for hierarchy - all depths */
+        .task-node[class*="depth-"]:not(.depth-0)::before {
           content: '';
           position: absolute;
           left: calc(var(--depth, 0) * 32px - 16px);
@@ -340,6 +387,25 @@ export default function TaskTree({ tasks, roles, projectId, version, onTasksChan
           bottom: 0;
           width: 2px;
           background: rgba(72, 229, 194, 0.2);
+        }
+        /* Hover actions visibility */
+        .task-hover-actions {
+          display: flex;
+          gap: 4px;
+          opacity: 0;
+          transition: opacity 0.15s ease;
+          margin-right: 4px;
+        }
+        .task-node-hoverable:hover .task-hover-actions {
+          opacity: 1;
+        }
+        .add-child-btn:hover {
+          color: var(--color-accent-mint) !important;
+          background: rgba(72, 229, 194, 0.15) !important;
+        }
+        .delete-task-btn:hover {
+          color: #ff6b6b !important;
+          background: rgba(255, 107, 107, 0.1) !important;
         }
 
         .task-left {
