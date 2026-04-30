@@ -116,6 +116,22 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
     setTimeout(() => setIsSaving(false), 800);
   };
 
+  const handleFinalizeProject = async () => {
+    if (totalProgress < 100 || project.status === 'completed') return;
+    setIsSaving(true);
+    const { error } = await insforge.database
+      .from('projects')
+      .update({ status: 'completed' })
+      .eq('id', project.id);
+    
+    if (error) {
+      console.error("Error al finalizar el proyecto:", error);
+    } else {
+      onProjectUpdate({ ...project, status: 'completed' });
+    }
+    setTimeout(() => setIsSaving(false), 800);
+  };
+
   const toggleDay = (dayId: number) => {
     const newDays = workingDays.includes(dayId)
       ? workingDays.filter(d => d !== dayId)
@@ -572,7 +588,24 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
         {/* Lado Derecho: Visualización y Dashboard */}
         <div className="tracking-main">
           {/* Tarjeta Hero Consolidada: Meta vs Proyectada */}
-          <div className="glass-card original-hero-card meta-hero">
+          <div className="glass-card original-hero-card meta-hero relative overflow-hidden">
+            {/* Botón de Finalización como Acción Principal */}
+            <div className="absolute top-6 right-6 z-10">
+              {project.status === 'completed' ? (
+                <div className="status-badge-completed">
+                  <CheckCircle size={14} /> PROYECTO COMPLETADO
+                </div>
+              ) : (
+                <button
+                  onClick={handleFinalizeProject}
+                  disabled={totalProgress < 100 || isSaving}
+                  className={`finalize-master-btn ${totalProgress === 100 ? 'ready' : 'waiting'}`}
+                >
+                  {isSaving ? 'Guardando...' : 'Finalizar Proyecto'}
+                </button>
+              )}
+            </div>
+
             <div className="flex flex-col md:flex-row justify-between gap-6">
               
               {/* Lado Izquierdo: Plan Ideal */}
@@ -598,11 +631,12 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
 
               {/* Lado Derecho: Avance Real / Proyección */}
               <div className="flex-1 md:border-l md:border-white/10 md:pl-6">
-                <div className="hero-header-flex mb-2 opacity-80 justify-between">
+                <div className="hero-header-flex mb-2 opacity-80 justify-between items-center">
                   <div className="flex items-center gap-2">
                     <Activity size={18} className="text-blue-400" />
                     <span className="hero-label uppercase tracking-wider text-sm">Entrega Proyectada (Real)</span>
                   </div>
+                  
                   {(() => {
                     const metaDiff = projectedEndDate && idealEndDate ? differenceInCalendarDays(projectedEndDate, idealEndDate) : 0;
                     const isAhead = metaDiff < 0;
@@ -610,11 +644,11 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
                     return (
                       <div className="flex align-center gap-2">
                         {metaDiff !== 0 && (
-                          <span className={`status-badge-v4 ${isAhead ? 'ahead' : 'delayed'} px-2 py-0.5 rounded text-xs font-bold`}>
+                          <span className={`status-badge-v4 ${isAhead ? 'ahead' : 'delayed'} px-2 py-0.5 rounded text-[10px] font-bold`}>
                             {isAhead ? 'Adelantado' : 'Retraso'} {isAhead ? '-' : '+'}{absDiff}d
                           </span>
                         )}
-                        {metaDiff === 0 && <span className="status-badge-v4 ahead px-2 py-0.5 rounded text-xs font-bold">En Tiempo</span>}
+                        {metaDiff === 0 && <span className="status-badge-v4 ahead px-2 py-0.5 rounded text-[10px] font-bold">En Tiempo</span>}
                       </div>
                     );
                   })()}
@@ -798,6 +832,53 @@ export default function ProjectTracking({ project, tasks, roles, onProjectUpdate
         
         .premium-date-input { width: 100%; background: rgba(0,0,0,0.2) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 12px !important; color: white !important; padding: 12px !important; outline: none; }
         
+        .finalize-master-btn {
+          padding: 10px 20px;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+          border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .finalize-master-btn.waiting {
+          background: rgba(255,255,255,0.02);
+          color: rgba(255,255,255,0.15);
+          cursor: not-allowed;
+          border-color: rgba(255,255,255,0.05);
+        }
+
+        .finalize-master-btn.ready {
+          background: rgba(79, 209, 197, 0.1);
+          color: var(--color-accent-mint);
+          border-color: rgba(79, 209, 197, 0.5);
+          box-shadow: 0 0 20px rgba(79, 209, 197, 0.05);
+          cursor: pointer;
+        }
+
+        .finalize-master-btn.ready:hover {
+          background: var(--color-accent-mint);
+          color: #1c2541;
+          box-shadow: 0 10px 30px rgba(79, 209, 197, 0.4);
+          transform: translateY(-2px) scale(1.02);
+        }
+
+        .status-badge-completed {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(79, 209, 197, 0.15);
+          color: var(--color-accent-mint);
+          padding: 10px 20px;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-weight: 800;
+          border: 1px solid rgba(79, 209, 197, 0.3);
+          box-shadow: inset 0 0 10px rgba(79, 209, 197, 0.1);
+        }
+
         .mode-toggle-v4 { display: flex; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 14px; margin-bottom: 8px; }
         .mode-btn { flex: 1; padding: 8px; border: none; background: transparent; color: var(--color-text-secondary); font-size: 0.75rem; font-weight: 700; border-radius: 10px; cursor: pointer; transition: 0.2s; }
         .mode-btn.active { background: var(--color-accent-mint); color: var(--color-bg-primary); }

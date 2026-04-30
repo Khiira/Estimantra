@@ -384,6 +384,7 @@ export default function ProjectEstimator() {
                    <option value="en_progreso">🟢 En Progreso</option>
                    <option value="en_espera">🟡 En Espera (Bloqueado)</option>
                    <option value="aprobado">🔵 Aprobado (Seguimiento)</option>
+                   {project.status === 'completed' && <option value="completed">✅ Finalizado</option>}
                  </select>
                </div>
 
